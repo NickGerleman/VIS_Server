@@ -15,8 +15,8 @@ namespace vis
 
 	///
 	/// Create a visualizer showing the relative error in an error cloud (in red)
-	/// @param spCloud the error cloud
+	/// @param cloud the error cloud
 	///
-	std::shared_ptr<pcl::visualization::PCLVisualizer> createErrorVisualizer(const ErrorPointCloud& spCloud);
+	std::shared_ptr<pcl::visualization::PCLVisualizer> createErrorVisualizer(const ErrorPointCloud& cloud);
 
 }

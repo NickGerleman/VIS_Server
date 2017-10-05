@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <csignal>
 #include <cmath>
 #include <cstdbool>
 #include <functional>
@@ -16,6 +17,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -23,7 +25,13 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
-#include <boost/thread/thread.hpp>
+#include <boost/lexical_cast.hpp>
+
+#include <cpprest/asyncrt_utils.h>
+#include <cpprest/filestream.h>
+#include <cpprest/http_listener.h>
+#include <cpprest/json.h>
+#include <cpprest/uri.h>
 
 #include <lib/miniball/seb.h>
 
@@ -37,5 +45,7 @@
 #include <pcl/registration/registration.h>
 #include <pcl/registration/transformation_estimation_svd_scale.h>
 #include <pcl/visualization/pcl_visualizer.h>
+
+#include <Shlobj.h>
 
 #pragma warning(pop)

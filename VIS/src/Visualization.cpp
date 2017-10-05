@@ -22,11 +22,11 @@ namespace vis
 	}
 
 
-	std::shared_ptr<pcl::visualization::PCLVisualizer> createErrorVisualizer(const ErrorPointCloud& spCloud)
+	std::shared_ptr<pcl::visualization::PCLVisualizer> createErrorVisualizer(const ErrorPointCloud& cloud)
 	{
 		// Use the first statistical outlier as the beginning of the gradient
 		std::vector<float> orderedErrors;
-		for (const auto& point : spCloud)
+		for (const auto& point : cloud)
 			orderedErrors.push_back(point.intensity);
 		std::sort(orderedErrors.begin(), orderedErrors.end());
 
@@ -40,7 +40,7 @@ namespace vis
 
 		// Add to colored point cloud
 		auto spColorCloud = boost::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>();
-		for (const auto& point : spCloud)
+		for (const auto& point : cloud)
 		{
 			auto normalizedError = (point.intensity - gradientMin) / scale;
 			normalizedError = std::fmin(1.0f, std::fmax(0.0f, normalizedError));
