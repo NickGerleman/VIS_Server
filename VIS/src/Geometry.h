@@ -5,6 +5,7 @@ namespace vis
 
 	using Mesh = pcl::geometry::TriangleMesh<pcl::geometry::DefaultMeshTraits<pcl::PointXYZ>>;
 	using PointCloud = pcl::PointCloud<pcl::PointXYZ>;
+	using ErrorPointCloud = pcl::PointCloud<pcl::PointXYZI>;
 
 	///
 	/// The bounding sphere of a point cloud
@@ -125,11 +126,11 @@ namespace vis
 
 
 	///
-	/// Centers a pointcloud using its precomputed bounding sphere, which will be modified
+	/// Centers a point cloud using its precomputed bounding sphere
 	/// @param cloud the reference point cloud
 	/// @param bounds the bounding sphere of the reference point cloud
 	///
-	boost::shared_ptr<PointCloud> centerPointCloud(const PointCloud& cloud, BoundingSphere& bounds);
+	boost::shared_ptr<PointCloud> centerPointCloud(const PointCloud& cloud, const BoundingSphere& bounds);
 
 
 	///

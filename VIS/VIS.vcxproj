@@ -130,8 +130,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\error_detection_module\ErrorDetection.cpp" />
-    <ClCompile Include="src\error_detection_module\Statistics.cpp" />
+    <ClCompile Include="src\ErrorDetection.cpp" />
     <ClCompile Include="src\Geometry.cpp" />
     <ClCompile Include="src\Main.cpp" />
     <ClCompile Include="pch.cpp">
@@ -141,6 +140,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\MeshIo.cpp" />
+    <ClCompile Include="src\Visualization.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lib\miniball\Seb-inl.h" />
@@ -150,11 +150,11 @@
     <ClInclude Include="lib\miniball\Subspan-inl.h" />
     <ClInclude Include="lib\miniball\Subspan.h" />
     <ClInclude Include="lib\TinyObjLoader.h" />
-    <ClInclude Include="src\error_detection_module\ErrorDetection.h" />
-    <ClInclude Include="src\error_detection_module\Statistics.h" />
+    <ClInclude Include="src\ErrorDetection.h" />
     <ClInclude Include="src\Geometry.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="src\MeshIo.h" />
+    <ClInclude Include="src\Visualization.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
@@ -165,7 +165,6 @@
     <None Include="models\cylinder_with_spokes.stl" />
     <None Include="models\cylinder_with_spokes_facing_down.stl" />
     <None Include="models\cylinder_with_three_spokes.stl" />
-    <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

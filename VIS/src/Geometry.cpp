@@ -230,7 +230,7 @@ namespace vis
 	}
 
 
-	boost::shared_ptr<PointCloud> centerPointCloud(const PointCloud& cloud, BoundingSphere& bounds)
+	boost::shared_ptr<PointCloud> centerPointCloud(const PointCloud& cloud, const BoundingSphere& bounds)
 	{
 		auto translate = Eigen::Translation3f
 		(
@@ -241,7 +241,6 @@ namespace vis
 
 		auto spCenteredCloud = boost::make_shared<PointCloud>();
 		pcl::transformPointCloud(cloud, *spCenteredCloud, Eigen::Affine3f(translate));
-		bounds.center = Eigen::Vector3f(0, 0, 0);
 		return spCenteredCloud;
 
 	}
@@ -293,6 +292,7 @@ namespace vis
 		// Center our existing mesh and get an ideal cloud
 		auto refBounds = calculateBoundingSphere(reference.getVertexDataCloud(), qualitySettings);
 		auto spCenteredMeshCloud = centerPointCloud(reference.getVertexDataCloud(), refBounds);
+		refBounds.center = Vector3f(0, 0, 0);
 		reference.setVertexDataCloud(*spCenteredMeshCloud);
 
 		double sprayDensity = (qualitySettings.surfaceSprayRatio / surfaceArea(reference)) * spTarget->size();
@@ -301,6 +301,7 @@ namespace vis
 		// Center our target
 		auto targetBounds = calculateBoundingSphere(*spTarget, qualitySettings);
 		auto spCenteredTarget = centerPointCloud(*spTarget, targetBounds);
+		targetBounds.center = Vector3f(0, 0, 0);
 		*(spTarget) = *spCenteredTarget;
 
 		// Get translation, scale, and coarse rotation in check
