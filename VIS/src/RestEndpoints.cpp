@@ -133,7 +133,7 @@ namespace vis
 		}
 		else
 		{
-			request.reply(status_codes::BadRequest);
+			request.reply(status_codes::NotFound);
 		}
 	}
 
