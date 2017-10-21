@@ -1,8 +1,10 @@
 #include "pch.h"
 #include "RestEndpoints.h"
+#include "Camera.h"
 #include "ErrorDetection.h"
 #include "Geometry.h"
 #include "MeshIO.h"
+#include "ServerCommon.h"
 
 using namespace boost;
 using namespace web;
@@ -46,23 +48,26 @@ namespace vis
 	}
 
 
-	static optional<fs::path> ensureModelPath()
+	void scanRoom(const web::http::http_request& request)
 	{
-		char documentPath[MAX_PATH];
-		SHGetFolderPath(nullptr, CSIDL_PERSONAL, nullptr, SHGFP_TYPE_CURRENT, documentPath);
-		fs::path modelPath = fs::path(documentPath).append("VIS/Models");
-		
-		if (!fs::is_directory(modelPath))
+		auto spCamera = StructureSensorAccess::acquireCamera();
+		auto spRoomCloud = spCamera->captureFrame()->generatePointCloud();
+
+		// Convert to JSON and send back
+		auto resObj = json::value::object();
+		auto& pointCloud = resObj[L"points"] = json::value::array();
+
+		size_t i = 0;
+		for (const auto& point : *spRoomCloud)
 		{
-			boost::system::error_code error;
-			if (!fs::create_directories(modelPath, error))
-			{
-				std::cerr << error.message() << std::endl;
-				return optional<fs::path>();
-			}
+			auto& pointArr = pointCloud[i] = json::value::array();
+			pointArr[0] = point.x;
+			pointArr[1] = point.y;
+			pointArr[2] = point.z;
+			i++;
 		}
 
-		return modelPath;
+		request.reply(status_codes::OK, resObj);
 	}
 
 
@@ -138,4 +143,3 @@ namespace vis
 	}
 
 }
-

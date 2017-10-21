@@ -11,6 +11,13 @@ namespace vis
 
 
 	///
+	/// Capture a frame from the camera and send it as a point cloud
+	/// @param request the incoming request
+	///
+	void scanRoom(const web::http::http_request& request);
+
+
+	///
 	/// List the mesh files stored on the machine
 	/// @param request the incoming request
 	///

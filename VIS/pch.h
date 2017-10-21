@@ -12,6 +12,7 @@
 #include <csignal>
 #include <cmath>
 #include <cstdbool>
+#include <exception>
 #include <functional>
 #include <initializer_list>
 #include <iostream>
@@ -46,6 +47,12 @@
 #include <pcl/registration/transformation_estimation_svd_scale.h>
 #include <pcl/visualization/pcl_visualizer.h>
 
+#include <OpenNI2/OpenNI.h>
+
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #include <Shlobj.h>
+#include <NuiApi.h>
+#include <NuiKinectFusionApi.h>
 
 #pragma warning(pop)

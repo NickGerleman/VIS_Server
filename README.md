@@ -9,11 +9,11 @@ This project should be used with Visual Studio 2015 Update 3. Packages are
 managed using vcpkg. The following packages are neccesary to install:
 
 - cpprestsdk
-- kinectsdk1
 - pcl
 
-The OpenNI drivers for the Occipital camera may need to be manually copied to the project
-output currently.
+It is additionally required that the Kinect SDK 1.8 and Kinect Toolkit 1.8 be seperately
+installed. These can be found at https://www.microsoft.com/en-us/download/details.aspx?id=40278
+and https://www.microsoft.com/en-us/download/details.aspx?id=40276.
 
 ### Endpoints
 **Note** The following is a work in progress. More endpoints will be added in the future
@@ -41,6 +41,24 @@ Error handling or interruption is not currently implemented.
 	"points": [
 		[1.0, -1.0, 1.0, 4.5],
 		[-1.0, 2.0, 1.0, 8.3]
+	]
+}
+```
+
+#### GET /room-scan
+Capture a frame from a camera and send the entire room back as a three-component point
+cloud.
+
+| Status| Description |
+|-|-|
+| 200 | Scan was successful 
+
+**Sample Response**
+```json
+{
+	"points": [
+		[1.0, -1.0, 1.0],
+		[-1.0, 2.0, 1.0]
 	]
 }
 ```
