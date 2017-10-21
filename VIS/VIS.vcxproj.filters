@@ -39,7 +39,10 @@
     <ClCompile Include="src\RestEndpoints.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Routing.cpp">
+    <ClCompile Include="src\Camera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ServerCommon.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -52,6 +55,9 @@
     <None Include="models\cylinder_with_spokes_facing_down.stl" />
     <None Include="models\cylinder_with_spokes.stl" />
     <None Include="models\cube_missing_corner.stl" />
+    <None Include="res\bin\KinectFusion180_64.dll" />
+    <None Include="res\bin\OpenNI2\Drivers\PS1080.ini" />
+    <None Include="res\bin\OpenNI2\Drivers\PS1080.dll" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lib\TinyObjLoader.h">
@@ -93,7 +99,10 @@
     <ClInclude Include="src\RestEndpoints.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Routing.h">
+    <ClInclude Include="src\Camera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ServerCommon.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

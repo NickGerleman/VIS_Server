@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "RestEndpoints.h"
-#include "Routing.h"
+#include "ServerCommon.h"
 
 using namespace web;
 using namespace http;
@@ -36,11 +36,13 @@ int main(int argc, char *argv[])
 		.set_port(port)
 		.to_uri();
 
+	vis::ensureModelPath();
 	experimental::listener::http_listener listener(listenUri);
 	listener.open().wait();
 	listener.support(vis::RequestRouter(
 	{
 		vis::HttpRoute(methods::GET, L"/object-scan", &vis::scanObject),
+		vis::HttpRoute(methods::GET, L"/room-scan", &vis::scanRoom),
 		vis::HttpRoute(methods::GET, L"/mesh-file/all", &vis::listMeshFiles),
 		vis::HttpRoute(methods::GET, L"/mesh-file", &vis::downloadMeshFile)
 	}));
@@ -53,4 +55,3 @@ int main(int argc, char *argv[])
 
 	return EXIT_SUCCESS;
 }
-

@@ -4,6 +4,13 @@ namespace vis
 {
 
 	///
+	/// Ensure that the model directory exists, creating it if neccesary. Returns
+	/// the path to this directory
+	///
+	boost::optional<boost::filesystem::path> ensureModelPath();
+
+
+	///
 	/// Binding of a path to action 
 	///
 	class HttpRoute
@@ -66,5 +73,4 @@ namespace vis
 	private:
 		std::vector<HttpRoute> m_routes;
 	};
-
 }
