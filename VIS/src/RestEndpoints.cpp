@@ -21,30 +21,15 @@ namespace vis
 		std::lock_guard<std::mutex> scanLock(scanMutex);
 
 		// For now, use our mock data to generate an error cloud
-		auto spIdealMesh = vis::tryLoadBinaryStlFile("models/cube.stl");
-		auto spCaptureMesh = vis::tryLoadBinaryStlFile("captures/cubert_realsense.stl");
+		auto spIdealMesh = tryLoadBinaryStlFile("models/cube.stl");
+		auto spCaptureMesh = tryLoadBinaryStlFile("captures/cubert_realsense.stl");
 		auto spCaptureCloud = boost::make_shared<vis::PointCloud>(spCaptureMesh->getVertexDataCloud());
 		
 		vis::AlignmentQuality quality;
-		auto spIdealSurface = vis::alignPointCloud(*spIdealMesh, spCaptureCloud, quality);
-		auto spErrorCloud = vis::createErrorCloud(spIdealSurface, *spCaptureCloud);
+		auto spIdealSurface = alignPointCloud(*spIdealMesh, spCaptureCloud, quality);
+		auto spErrorCloud = createErrorCloud(spIdealSurface, *spCaptureCloud);
 
-		// Convert to JSON and send back to the client
-		auto resObj = json::value::object();
-		auto& pointCloud = resObj[L"points"] = json::value::array();
-		
-		size_t i = 0;
-		for (const auto& point : *spErrorCloud)
-		{
-			auto& pointArr = pointCloud[i] = json::value::array();
-			pointArr[0] = point.x;
-			pointArr[1] = point.y;
-			pointArr[2] = point.z;
-			pointArr[3] = point.intensity;
-			i++;
-		}
-
-		request.reply(status_codes::OK, resObj);
+		respondWithCloud(request, *spErrorCloud);
 	}
 
 
@@ -52,28 +37,13 @@ namespace vis
 	{
 		auto spCamera = StructureSensorAccess::acquireCamera();
 		auto spRoomCloud = spCamera->captureFrame()->generatePointCloud();
-
-		// Convert to JSON and send back
-		auto resObj = json::value::object();
-		auto& pointCloud = resObj[L"points"] = json::value::array();
-
-		size_t i = 0;
-		for (const auto& point : *spRoomCloud)
-		{
-			auto& pointArr = pointCloud[i] = json::value::array();
-			pointArr[0] = point.x;
-			pointArr[1] = point.y;
-			pointArr[2] = point.z;
-			i++;
-		}
-
-		request.reply(status_codes::OK, resObj);
+		respondWithCloud(request, *spRoomCloud);
 	}
 
 
 	void listMeshFiles(const http_request& request)
 	{
-		auto modelPath = ensureModelPath();
+		auto modelPath = vis::ensureModelPath();
 		if (!modelPath)
 		{
 			request.reply(status_codes::InternalError);

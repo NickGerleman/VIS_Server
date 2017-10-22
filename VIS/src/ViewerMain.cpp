@@ -21,7 +21,7 @@
 //	auto spCameraViewer = std::make_shared<pcl::visualization::PCLVisualizer>("Camera");
 //	
 //	spCameraViewer->addPointCloud(spCamera->captureFrame()->generatePointCloud());
-//	spCameraViewer->setCameraPosition(0.0, 0.0, -2.0, 0.0, 1.0, 0.0);
+//	spCameraViewer->setCameraPosition(0.0, 0.0, 1.0, 0.0, 1.0, 0.0);
 //
 //	auto spAlignmentViewer = vis::createAlignmentVisualizer(spIdealSurface, spCaptureCloud);
 //	auto spErrorViewer = vis::createErrorVisualizer(*spErrorCloud);

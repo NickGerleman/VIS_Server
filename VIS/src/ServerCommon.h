@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Geometry.h"
+
 namespace vis
 {
 
@@ -8,6 +10,22 @@ namespace vis
 	/// the path to this directory
 	///
 	boost::optional<boost::filesystem::path> ensureModelPath();
+
+
+	///
+	/// Respond to an HTTP request with a given point cloud
+	/// @param res the HTTP response
+	/// @param cloud the cloud to write
+	///
+	void respondWithCloud(const web::http::http_request& req, const PointCloud& cloud);
+
+
+	///
+	/// Respond to an HTTP request with a given point cloud
+	/// @param res the HTTP response
+	/// @param cloud the cloud to write
+	///
+	void respondWithCloud(const web::http::http_request& req, const ErrorPointCloud& cloud);
 
 
 	///

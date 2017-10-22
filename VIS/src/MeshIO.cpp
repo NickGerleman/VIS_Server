@@ -9,6 +9,59 @@ namespace vis
 
 	using Vertex = std::array<float, 3>;
 
+
+	std::vector<uint8_t> convertCloudToSpc(const PointCloud& cloud)
+	{
+		std::vector<uint8_t> buffer;
+
+		std::array<uint32_t, 2> header
+		{
+			3, static_cast<uint32_t>(cloud.size())
+		};
+		auto* headerBytes = reinterpret_cast<uint8_t*>(&header);
+		buffer.insert(buffer.end(), headerBytes, headerBytes + sizeof(header));
+
+		for (auto& point : cloud)
+		{
+			std::array<float, 3> ptArray
+			{
+				point.x, point.y, point.z
+			};
+
+			const auto* pointBytes = reinterpret_cast<const uint8_t*>(&ptArray);
+			buffer.insert(buffer.end(), pointBytes, pointBytes + sizeof(ptArray));
+		}
+
+		return buffer;
+	}
+
+
+	std::vector<uint8_t> convertCloudToSpc(const ErrorPointCloud& cloud)
+	{
+		std::vector<uint8_t> buffer;
+
+		std::array<uint32_t, 2> header
+		{
+			4, static_cast<uint32_t>(cloud.size())
+		};
+		auto* headerBytes = reinterpret_cast<uint8_t*>(&header);
+		buffer.insert(buffer.end(), headerBytes, headerBytes + sizeof(header));
+
+		for (auto& point : cloud)
+		{
+			std::array<float, 4> ptArray
+			{
+				point.x, point.y, point.z, point.intensity
+			};
+
+			const auto* pointBytes = reinterpret_cast<const uint8_t*>(&ptArray);
+			buffer.insert(buffer.end(), pointBytes, pointBytes + sizeof(ptArray));
+		}
+
+		return buffer;
+	}
+
+
 	std::shared_ptr<Mesh> tryLoadObjFile(const std::string& filename)
 	{
 		tinyobj::attrib_t attribs;

@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "MeshIo.h"
 #include "ServerCommon.h"
 
 using namespace web;
@@ -24,6 +25,63 @@ namespace vis
 		}
 
 		return modelPath;
+	}
+
+
+	static json::value jsonPoint(const pcl::PointXYZ& point)
+	{
+		auto& pointArr = json::value::array();
+		pointArr[0] = point.x;
+		pointArr[1] = point.y;
+		pointArr[2] = point.z;
+
+		return pointArr;
+	}
+
+
+	static json::value jsonPoint(const pcl::PointXYZI& point)
+	{
+		auto& pointArr = json::value::array();
+		pointArr[0] = point.x;
+		pointArr[1] = point.y;
+		pointArr[2] = point.z;
+		pointArr[3] = point.intensity;
+
+		return pointArr;
+	}
+
+
+	template <typename TCloud>
+	static void respondWithCloudT(const web::http::http_request& request, const TCloud& cloud)
+	{
+		auto queryParams = uri::split_query(request.request_uri().query());
+		if (queryParams.find(L"spc") != queryParams.end() && queryParams[L"spc"] == L"true")
+		{
+			auto spcBytes = convertCloudToSpc(cloud);
+			request.reply(status_codes::OK, Concurrency::streams::bytestream::open_istream(spcBytes));
+		}
+		else
+		{
+			auto resObj = json::value::object();
+			auto& pointCloudArray = resObj[L"points"] = json::value::array();
+
+			for (size_t i = 0; i < cloud.size(); i++)
+				pointCloudArray[i] = jsonPoint(cloud[i]);
+
+			request.reply(status_codes::OK, resObj);
+		}
+	}
+
+
+	void respondWithCloud(const web::http::http_request& req, const PointCloud& cloud)
+	{
+		respondWithCloudT(req, cloud);
+	}
+
+
+	void respondWithCloud(const web::http::http_request& req, const ErrorPointCloud& cloud)
+	{
+		respondWithCloudT(req, cloud);
 	}
 
 
