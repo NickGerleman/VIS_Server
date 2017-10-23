@@ -1,12 +1,13 @@
 ## VIS: Visual Inspection System
 
 Repository for the server-side of the Danfoss Visual Inspection System capstone
-project. This must be compiled and run on a Windows machine.
+project. This must be compiled and run on a Windows machine. The software is compatibe
+with the Occipital structure sensor, or a mock recording.
 
 ### Requirements 
 
-This project should be used with Visual Studio 2015 Update 3. Packages are
-managed using vcpkg. The following packages are neccesary to install:
+This project should be used with Visual Studio 2015 Update 3. Packages are managed using
+vcpkg. The following packages are neccesary to install:
 
 - cpprestsdk
 - pcl
@@ -14,6 +15,13 @@ managed using vcpkg. The following packages are neccesary to install:
 It is additionally required that the Kinect SDK 1.8 and Kinect Toolkit 1.8 be seperately
 installed. These can be found at https://www.microsoft.com/en-us/download/details.aspx?id=40278
 and https://www.microsoft.com/en-us/download/details.aspx?id=40276.
+
+### Command Line Arguments
+
+| Switch | Description                                             |
+|--------|---------------------------------------------------------|
+| --oni  | Path to a .ONI file to use instead of a physical camera |
+| --port | The port to listen on                                   |
 
 ### SPC Binary Point Clouds
 It is possible to receive any point cloud as a custom binary format called SPC. This is a

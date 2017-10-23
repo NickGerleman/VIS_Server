@@ -27,6 +27,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/program_options.hpp>
 
 #include <cpprest/asyncrt_utils.h>
 #include <cpprest/filestream.h>

@@ -1,6 +1,8 @@
 #include "pch.h"
-#include "MeshIo.h"
+
 #include "ServerCommon.h"
+#include "MeshIo.h"
+#include "RestEndpoints.h"
 
 using namespace web;
 using namespace http;
@@ -8,6 +10,7 @@ namespace fs = boost::filesystem;
 
 namespace vis
 {
+
 	boost::optional<fs::path> ensureModelPath()
 	{
 		char documentPath[MAX_PATH];
@@ -91,21 +94,21 @@ namespace vis
 	}
 
 
-	void HttpRoute::handle(const http_request& request)
+	void HttpRoute::handle(const http_request& request, const AppContext& ctx)
 	{
-		m_handler(request);
+		m_handler(request, ctx);
 	}
 
 
-	void RequestRouter::operator()(const http_request& request)
+	void AppServer::operator()(const http_request& request)
 	{
-		for (auto& route : m_routes)
+		for (auto& route : s_routes)
 		{
 			if (route.canHandle(request.method(), request.request_uri()))
 			{
 				try
 				{
-					route.handle(request);
+					route.handle(request, *m_pAppContext);
 				}
 				catch (std::runtime_error& ex)
 				{
@@ -119,4 +122,5 @@ namespace vis
 
 		request.reply(status_codes::NotFound);
 	}
+
 }

@@ -3,8 +3,15 @@
 
 using namespace openni;
 
+
 namespace vis
 {
+
+	static void assertNI(openni::Status status)
+	{
+		if (status != STATUS_OK)
+			throw std::runtime_error(OpenNI::getExtendedError());
+	}
 
 	ClipCube::ClipCube(const Eigen::Matrix4f& referenceTransform)
 		: m_inverseTransform(referenceTransform.inverse()) {}
@@ -70,17 +77,21 @@ namespace vis
 	}
 
 
-	void OpenNIFrame::clipFrame(const ClipCube& clipCube)
+	std::shared_ptr<DepthFrame> OpenNIFrame::clipFrame(const ClipCube& clipCube)
 	{
+		auto spClippedFrame = std::make_shared<OpenNIFrame>(*this);
+
 		for (int y = 0; y < this->height(); y++)
 		{
 			for (int x = 0; x < this->width(); x++)
 			{
 				auto worldPt = worldPtFromPixel(x, y);
 				if (!(worldPt && clipCube.intersects(worldPt.get())))
-					m_depthPixels[(y * height()) + width()] = 0;
+					(*spClippedFrame).m_depthPixels[(y * height()) + width()] = 0;
 			}
 		}
+
+		return spClippedFrame;
 	}
 
 
@@ -149,43 +160,38 @@ namespace vis
 	}
 
 
-	std::unique_ptr<DepthFrame> OpenNICamera::captureFrame()
+	std::shared_ptr<DepthFrame> OpenNICamera::captureFrame()
 	{
 		VideoFrameRef niFrame;
 		if (m_spDepthStream->readFrame(&niFrame) != Status::STATUS_OK)
 			throw std::runtime_error(OpenNI::getExtendedError());
 
-		return std::make_unique<OpenNIFrame>(niFrame, m_spDepthStream, m_pCameraParams);
+		return std::make_shared<OpenNIFrame>(niFrame, m_spDepthStream, m_pCameraParams);
 	}
 
 
-	/*static*/ std::unique_ptr<OpenNICamera> StructureSensorAccess::acquireCamera()
+	/*static*/ std::unique_ptr<OpenNICamera> StructureSensor::acquireCamera()
 	{
 		auto spDevice = std::make_unique<openni::Device>();
-		if (spDevice->open(ANY_DEVICE) != STATUS_OK)
-			throw std::runtime_error(OpenNI::getExtendedError());
-
+		assertNI(spDevice->open(ANY_DEVICE));
 		auto spDepthStream = std::make_shared<VideoStream>();
-		if (spDepthStream->create(*spDevice, SENSOR_DEPTH) != STATUS_OK)
-			throw std::runtime_error(OpenNI::getExtendedError());
+		
+		assertNI(spDepthStream->create(*spDevice, SENSOR_DEPTH));
+		spDepthStream->setMirroringEnabled(false);
 
 		VideoMode vgaMode;
 		vgaMode.setFps(30);
 		vgaMode.setPixelFormat(PIXEL_FORMAT_DEPTH_1_MM);
 		vgaMode.setResolution(640, 480);
-		
 		spDepthStream->setVideoMode(vgaMode);
-		spDepthStream->setMirroringEnabled(false);
 
-		if (spDepthStream->start() != Status::STATUS_OK)
-			throw std::runtime_error(OpenNI::getExtendedError());
+		assertNI(spDepthStream->start());
 
 		static std::recursive_mutex s_camMutex;
-		std::unique_lock<std::recursive_mutex> threadLock(s_camMutex);
 		return std::unique_ptr<OpenNICamera>(new OpenNICamera(
 				std::move(spDevice),
 				spDepthStream,
-				std::move(threadLock),
+				std::unique_lock<std::recursive_mutex>(s_camMutex),
 				cameraIntrinsics()
 		));
 	}
@@ -193,20 +199,18 @@ namespace vis
 
 	/*static*/ std::shared_ptr<MockCamera> MockCamera::make(const std::string& filepath, const NUI_FUSION_CAMERA_PARAMETERS* pCameraParams)
 	{
-		static std::recursive_mutex s_unusedMutex;
-
 		auto spDevice = std::make_unique<openni::Device>();
-		if (spDevice->open(filepath.c_str()) != STATUS_OK)
-			throw std::runtime_error(OpenNI::getExtendedError());
+		assertNI(spDevice->open(filepath.c_str()));
 
 		auto spDepthStream = std::make_shared<openni::VideoStream>();
-		if (spDepthStream->create(*spDevice, SENSOR_DEPTH) != STATUS_OK)
-			throw std::runtime_error(OpenNI::getExtendedError());
+		assertNI(spDepthStream->create(*spDevice, SENSOR_DEPTH));
+		assertNI(spDepthStream->start());
 
-		if (spDepthStream->start() != STATUS_OK)
-			throw std::runtime_error(OpenNI::getExtendedError());
+		// We're not having multiple threads access the same physical device,
+		// so we don't actually need the handle to have any sort of real lock
+		static std::recursive_mutex s_unusedMutex;
 
-		auto* pPlaybackControls = spDevice->getPlaybackControl();		
+		auto* pPlaybackControls = spDevice->getPlaybackControl();
 		auto spMockCamera = std::shared_ptr<MockCamera>(new MockCamera(
 			std::move(spDevice),
 			spDepthStream,
@@ -230,7 +234,8 @@ namespace vis
 		return m_static;
 	}
 
-	std::unique_ptr<DepthFrame> MockCamera::captureFrame()
+
+	std::shared_ptr<DepthFrame> MockCamera::captureFrame()
 	{
 		auto spFrame = OpenNICamera::captureFrame();
 
@@ -252,7 +257,8 @@ namespace vis
 		return spFrame;
 	}
 
-	const NUI_FUSION_CAMERA_PARAMETERS* StructureSensorAccess::cameraIntrinsics()
+
+	const NUI_FUSION_CAMERA_PARAMETERS* StructureSensor::cameraIntrinsics()
 	{
 		static NUI_FUSION_CAMERA_PARAMETERS* pParams = nullptr;
 

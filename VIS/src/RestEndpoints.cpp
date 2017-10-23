@@ -14,7 +14,16 @@ namespace fs = filesystem;
 namespace vis
 {
 
-	void scanObject(const http_request& request)
+	std::vector<HttpRoute> AppServer::s_routes
+	{
+		HttpRoute(methods::GET,  L"/object-scan",    &scanObject),
+		HttpRoute(methods::GET,  L"/room-scan",      &scanRoom),
+		HttpRoute(methods::GET,  L"/mesh-file/all",  &listMeshFiles),
+		HttpRoute(methods::GET,  L"/mesh-file",      &downloadMeshFile)
+	};
+
+
+	void scanObject(const web::http::http_request& request, const AppContext& ctx)
 	{
 		// We only want one client to be able to do scanning/rotation at once
 		static std::mutex scanMutex;
@@ -33,16 +42,14 @@ namespace vis
 	}
 
 
-	void scanRoom(const web::http::http_request& request)
+	void scanRoom(const web::http::http_request& request, const AppContext& ctx)
 	{
-		NUI_FUSION_CAMERA_PARAMETERS params;
-		auto spCamera = MockCamera::make("C:\\up.oni", &params);
-		auto spRoomCloud = spCamera->captureFrame()->generatePointCloud();
+		auto spRoomCloud = ctx.getCamera()->captureFrame()->generatePointCloud();
 		respondWithCloud(request, *spRoomCloud);
 	}
 
 
-	void listMeshFiles(const http_request& request)
+	void listMeshFiles(const http_request& request, const AppContext& ctx)
 	{
 		auto modelPath = vis::ensureModelPath();
 		if (!modelPath)
@@ -74,7 +81,7 @@ namespace vis
 	}
 
 
-	void downloadMeshFile(const web::http::http_request& request)
+	void downloadMeshFile(const web::http::http_request& request, const AppContext& ctx)
 	{
 		auto queryParams = uri::split_query(request.request_uri().query());
 		if (queryParams.find(L"path") == queryParams.end())
