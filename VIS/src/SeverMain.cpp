@@ -27,6 +27,9 @@ void sleepUntilKilled()
 
 int main(int argc, char *argv[])
 {
+	if (openni::OpenNI::initialize() != openni::STATUS_OK)
+		throw std::runtime_error(openni::OpenNI::getExtendedError());
+
 	int port = (argc > 1)
 		? boost::lexical_cast<int>(argv[1])
 		: DEFAULT_PORT;

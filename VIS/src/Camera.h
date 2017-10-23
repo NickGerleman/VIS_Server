@@ -155,7 +155,7 @@ namespace vis
 		~OpenNICamera();
 		std::unique_ptr<DepthFrame> captureFrame() override;
 
-	private:
+	protected:
 
 		///
 		/// Build a handle to the camera stream
@@ -164,18 +164,77 @@ namespace vis
 		/// @param threadLock a mutex held by the camera handle
 		/// @pram pCameraParams camera intrinsics ised for reconstruction
 		///
-		OpenNICamera(std::unique_ptr<openni::Device> spDevice, std::shared_ptr<openni::VideoStream> spDepthStream, std::unique_lock<std::recursive_mutex>&& threadLock, const NUI_FUSION_CAMERA_PARAMETERS* pCameraParams)
+		OpenNICamera(
+			std::unique_ptr<openni::Device> spDevice,
+			std::shared_ptr<openni::VideoStream> spDepthStream,
+			std::unique_lock<std::recursive_mutex>&& threadLock,
+			const NUI_FUSION_CAMERA_PARAMETERS* pCameraParams
+		)
 			: m_spDevice(std::move(spDevice))
 			, m_spDepthStream(std::move(spDepthStream))
 			, m_threadLock(std::move(threadLock))
 			, m_pCameraParams(pCameraParams) {}
 
+		std::shared_ptr<openni::VideoStream> m_spDepthStream;
+
+	private:
 
 		std::unique_ptr<openni::Device> m_spDevice;
-		std::shared_ptr<openni::VideoStream> m_spDepthStream;
 		std::unique_lock<std::recursive_mutex> m_threadLock;
 		const NUI_FUSION_CAMERA_PARAMETERS* m_pCameraParams;
 
+	};
+
+
+	///
+	/// Camera that plays back data according to an ONI file. The camera will repeatedly
+	/// loop the first frame until told to playback the entire stream (for
+	/// platform rotation)
+	///
+	class MockCamera : public OpenNICamera
+	{
+	public:
+
+		///
+		/// Build the camera
+		/// @param filepath a path to an ONI file
+		/// @param pCameraParams intrinsics for the camera used
+		///
+		static std::shared_ptr<MockCamera> make(const std::string& filepath, const NUI_FUSION_CAMERA_PARAMETERS* pCameraParams);
+
+
+		///
+		/// Start showing the entirety of the footage, resuming looping at the first
+		/// frame after it is done.
+		///
+		void startFullLoop();
+
+		///
+		/// Whether the camera is looping the first frame only
+		///
+		bool isStatic();
+
+
+		std::unique_ptr<DepthFrame> captureFrame() override;
+
+	private:
+
+		MockCamera(
+			std::unique_ptr<openni::Device> spDevice,
+			std::shared_ptr<openni::VideoStream> spDepthStream,
+			std::unique_lock<std::recursive_mutex>&& threadLock,
+			const NUI_FUSION_CAMERA_PARAMETERS* pCameraParams,
+			openni::PlaybackControl* pControls
+		)
+			: OpenNICamera(std::move(spDevice), spDepthStream, std::move(threadLock), pCameraParams)
+			, m_pControls(pControls)
+			, m_static(true)
+			, m_curFrame(0) {}
+
+
+		openni::PlaybackControl* m_pControls;
+		bool m_static;
+		int m_curFrame;
 	};
 
 
@@ -194,6 +253,11 @@ namespace vis
 		/// thread has a handle.
 		///
 		static std::unique_ptr<OpenNICamera> acquireCamera();
+
+		///
+		/// Retrive instrinsics for the structure sensor
+		///
+		static const NUI_FUSION_CAMERA_PARAMETERS* cameraIntrinsics();
 	};
 
 }

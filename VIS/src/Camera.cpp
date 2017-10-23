@@ -161,18 +161,6 @@ namespace vis
 
 	/*static*/ std::unique_ptr<OpenNICamera> StructureSensorAccess::acquireCamera()
 	{
-		static std::recursive_mutex s_camMutex;
-		std::unique_lock<std::recursive_mutex> threadLock(s_camMutex);
-
-		// Initialize if this is the first call
-		static NUI_FUSION_CAMERA_PARAMETERS* s_pCameraParams = nullptr;
-		if (s_pCameraParams == nullptr)
-		{
-			if (OpenNI::initialize() != STATUS_OK)
-				throw std::runtime_error(OpenNI::getExtendedError());
-		}
-
-		// Set up device, configuring stream
 		auto spDevice = std::make_unique<openni::Device>();
 		if (spDevice->open(ANY_DEVICE) != STATUS_OK)
 			throw std::runtime_error(OpenNI::getExtendedError());
@@ -192,23 +180,93 @@ namespace vis
 		if (spDepthStream->start() != Status::STATUS_OK)
 			throw std::runtime_error(OpenNI::getExtendedError());
 
-		// Camera instrinsics taken from https://forums.structure.io/t/intrinsics-for-ios-devices-and-the-structure-sensor-depth-point-cloud-info/4640
-		if (s_pCameraParams == nullptr)
-		{
-			static NUI_FUSION_CAMERA_PARAMETERS params;
-			params.focalLengthX = 0.909375f;
-			params.focalLengthY = 1.2125f;
-			params.principalPointX = 0.5;
-			params.principalPointY = 0.5;
-			s_pCameraParams = &params;
-		}
-
+		static std::recursive_mutex s_camMutex;
+		std::unique_lock<std::recursive_mutex> threadLock(s_camMutex);
 		return std::unique_ptr<OpenNICamera>(new OpenNICamera(
 				std::move(spDevice),
 				spDepthStream,
 				std::move(threadLock),
-				s_pCameraParams
+				cameraIntrinsics()
 		));
+	}
+
+
+	/*static*/ std::shared_ptr<MockCamera> MockCamera::make(const std::string& filepath, const NUI_FUSION_CAMERA_PARAMETERS* pCameraParams)
+	{
+		static std::recursive_mutex s_unusedMutex;
+
+		auto spDevice = std::make_unique<openni::Device>();
+		if (spDevice->open(filepath.c_str()) != STATUS_OK)
+			throw std::runtime_error(OpenNI::getExtendedError());
+
+		auto spDepthStream = std::make_shared<openni::VideoStream>();
+		if (spDepthStream->create(*spDevice, SENSOR_DEPTH) != STATUS_OK)
+			throw std::runtime_error(OpenNI::getExtendedError());
+
+		if (spDepthStream->start() != STATUS_OK)
+			throw std::runtime_error(OpenNI::getExtendedError());
+
+		auto* pPlaybackControls = spDevice->getPlaybackControl();		
+		auto spMockCamera = std::shared_ptr<MockCamera>(new MockCamera(
+			std::move(spDevice),
+			spDepthStream,
+			std::unique_lock<std::recursive_mutex>(s_unusedMutex),
+			pCameraParams,
+			pPlaybackControls));
+
+		return spMockCamera;
+	}
+
+
+	void MockCamera::startFullLoop()
+	{
+		m_static = false;
+		m_curFrame = 0;
+	}
+
+
+	bool MockCamera::isStatic()
+	{
+		return m_static;
+	}
+
+	std::unique_ptr<DepthFrame> MockCamera::captureFrame()
+	{
+		auto spFrame = OpenNICamera::captureFrame();
+
+		if (m_static)
+		{
+			m_pControls->seek(*m_spDepthStream, 0);
+		}
+		else
+		{
+			int lenStream = m_pControls->getNumberOfFrames(*m_spDepthStream);
+			m_curFrame = (m_curFrame + 1) % lenStream;
+			if (m_curFrame == 0)
+			{
+				m_pControls->seek(*m_spDepthStream, 0);
+				m_static = true;
+			}
+		}
+
+		return spFrame;
+	}
+
+	const NUI_FUSION_CAMERA_PARAMETERS* StructureSensorAccess::cameraIntrinsics()
+	{
+		static NUI_FUSION_CAMERA_PARAMETERS* pParams = nullptr;
+
+		if (pParams == nullptr)
+		{
+			// Taken from https://forums.structure.io/t/intrinsics-for-ios-devices-and-the-structure-sensor-depth-point-cloud-info/4640
+			pParams = new NUI_FUSION_CAMERA_PARAMETERS;
+			pParams->focalLengthX = 0.909375f;
+			pParams->focalLengthY = 1.2125f;
+			pParams->principalPointX = 0.5;
+			pParams->principalPointY = 0.5;
+		}
+
+		return pParams;
 	}
 
 }

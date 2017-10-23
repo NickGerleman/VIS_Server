@@ -35,7 +35,8 @@ namespace vis
 
 	void scanRoom(const web::http::http_request& request)
 	{
-		auto spCamera = StructureSensorAccess::acquireCamera();
+		NUI_FUSION_CAMERA_PARAMETERS params;
+		auto spCamera = MockCamera::make("C:\\up.oni", &params);
 		auto spRoomCloud = spCamera->captureFrame()->generatePointCloud();
 		respondWithCloud(request, *spRoomCloud);
 	}

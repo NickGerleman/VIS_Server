@@ -164,6 +164,7 @@
     <ClCompile Include="src\Camera.cpp" />
     <ClCompile Include="src\ErrorDetection.cpp" />
     <ClCompile Include="src\Geometry.cpp" />
+    <ClCompile Include="src\PlatformControls.cpp" />
     <ClCompile Include="src\RestEndpoints.cpp" />
     <ClCompile Include="src\ServerCommon.cpp" />
     <ClCompile Include="src\SeverMain.cpp" />
@@ -190,6 +191,7 @@
     <ClInclude Include="src\Geometry.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="src\MeshIo.h" />
+    <ClInclude Include="src\PlatformControls.h" />
     <ClInclude Include="src\RestEndpoints.h" />
     <ClInclude Include="src\ServerCommon.h" />
     <ClInclude Include="src\Visualization.h" />
