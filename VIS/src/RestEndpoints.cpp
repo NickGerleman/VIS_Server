@@ -23,7 +23,7 @@ namespace vis
 	};
 
 
-	void scanObject(const web::http::http_request& request, const AppContext& ctx)
+	void scanObject(const web::http::http_request& request, const DeviceContext& ctx)
 	{
 		// We only want one client to be able to do scanning/rotation at once
 		static std::mutex scanMutex;
@@ -37,19 +37,20 @@ namespace vis
 		vis::AlignmentQuality quality;
 		auto spIdealSurface = alignPointCloud(*spIdealMesh, spCaptureCloud, quality);
 		auto spErrorCloud = createErrorCloud(spIdealSurface, *spCaptureCloud);
+		ProgressVisualizer::get()->notifyErrorCloud(spErrorCloud);
 
 		respondWithCloud(request, *spErrorCloud);
 	}
 
 
-	void scanRoom(const web::http::http_request& request, const AppContext& ctx)
+	void scanRoom(const web::http::http_request& request, const DeviceContext& ctx)
 	{
 		auto spRoomCloud = ctx.getCamera()->captureFrame()->generatePointCloud();
 		respondWithCloud(request, *spRoomCloud);
 	}
 
 
-	void listMeshFiles(const http_request& request, const AppContext& ctx)
+	void listMeshFiles(const http_request& request, const DeviceContext& ctx)
 	{
 		auto modelPath = vis::ensureModelPath();
 		if (!modelPath)
@@ -81,7 +82,7 @@ namespace vis
 	}
 
 
-	void downloadMeshFile(const web::http::http_request& request, const AppContext& ctx)
+	void downloadMeshFile(const web::http::http_request& request, const DeviceContext& ctx)
 	{
 		auto queryParams = uri::split_query(request.request_uri().query());
 		if (queryParams.find(L"path") == queryParams.end())

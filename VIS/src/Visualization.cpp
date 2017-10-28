@@ -1,8 +1,140 @@
 #include "pch.h"
 #include "Visualization.h"
 
+using namespace std::chrono;
+using namespace std::chrono_literals;
+
 namespace vis
 {
+
+	static const milliseconds PUSH_INTERVAL = 4ms;
+
+
+	ProgressRecord::ProgressRecord(
+		const std::shared_ptr<DepthFrame>& spDepthFrame,
+		const boost::shared_ptr<PointCloud>& spSurfaceCloud,
+		const std::shared_ptr<DepthFrame>& spClipFrame,
+		const boost::shared_ptr<PointCloud>& spAlignment,
+		const boost::shared_ptr<ErrorPointCloud>& spErrorCloud
+	)
+	{
+		if (spDepthFrame)
+			this->spDepthFrame = spDepthFrame->clone();
+
+		if (spSurfaceCloud)
+			this->spSurfaceCloud = boost::make_shared<PointCloud>(*spSurfaceCloud);
+
+		if (spClipFrame)
+			this->spClipFrame = spClipFrame->clone();
+
+		if (spAlignment)
+			this->spAlignment = boost::make_shared<PointCloud>(*spAlignment);
+
+		if (spErrorCloud)
+			this->spErrorCloud = boost::make_shared<ErrorPointCloud>(*spErrorCloud);
+	}
+
+
+	/*static*/ ProgressVisualizer* ProgressVisualizer::get()
+	{
+		static ProgressVisualizer* pViz = nullptr;
+		if (pViz == nullptr)
+			pViz = new ProgressVisualizer;
+		return pViz;
+	}
+
+
+	void ProgressVisualizer::start()
+	{
+		static bool isInitialized = false;
+		if (isInitialized)
+			return;
+		isInitialized = true;
+
+		m_visualizationThread = std::thread([this]()
+		{
+			pcl::visualization::PCLVisualizer viz;
+			viz.setWindowName("Visualizer");
+			viz.setShowFPS(false);
+
+			while (true)
+			{
+				viz.spinOnce();
+
+				{
+					std::lock_guard<std::mutex> lock(m_lastUpdateLock);
+					updateDisplay(viz, m_visThreadRecord);
+				}
+
+				std::this_thread::sleep_for(PUSH_INTERVAL);
+			}
+		});
+
+		m_visualizationThread.detach();
+	}
+
+
+	void ProgressVisualizer::notifyDepthFrame(const std::shared_ptr<DepthFrame>& spFrame)
+	{
+		m_spLastDepthFrame = spFrame;
+		pushIfNeeded();
+	}
+
+
+	void ProgressVisualizer::notifySurfaceCloud(const boost::shared_ptr<PointCloud>& spCloud)
+	{
+		m_spLastSurfaceCloud = spCloud;
+		pushIfNeeded();
+	}
+
+
+	void ProgressVisualizer::notifyClipFrame(const std::shared_ptr<DepthFrame>& spFrame)
+	{
+		m_spLastClipFrame = spFrame;
+		pushIfNeeded();
+	}
+
+
+	void ProgressVisualizer::notifyAlignment(const boost::shared_ptr<PointCloud>& spCloud)
+	{
+		m_spLastAlignment = spCloud;
+		pushIfNeeded();
+	}
+
+
+	void ProgressVisualizer::notifyErrorCloud(const boost::shared_ptr<ErrorPointCloud>& spCloud)
+	{
+		m_spLastErrorCloud = spCloud;
+		pushIfNeeded();
+	}
+
+
+	void ProgressVisualizer::pushIfNeeded()
+	{
+		auto curTime = high_resolution_clock::now();
+		if (curTime - m_lastPushTime > PUSH_INTERVAL)
+		{
+			std::lock_guard<std::mutex> lock(m_lastUpdateLock);
+			m_visThreadRecord = ProgressRecord
+			(
+				m_spLastDepthFrame,
+				m_spLastSurfaceCloud,
+				m_spLastClipFrame,
+				m_spLastAlignment,
+				m_spLastErrorCloud
+			);
+			m_lastPushTime = curTime;
+		}
+
+	}
+
+
+	/*static*/ void ProgressVisualizer::updateDisplay(pcl::visualization::PCLVisualizer& visualizer, const ProgressRecord& record)
+	{
+		if (record.spDepthFrame && !visualizer.updatePointCloud(record.spDepthFrame->generatePointCloud()))
+			visualizer.addPointCloud(record.spDepthFrame->generatePointCloud());
+	}
+
 
 	std::shared_ptr<pcl::visualization::PCLVisualizer> createAlignmentVisualizer(const boost::shared_ptr<PointCloud>& spReference, const boost::shared_ptr<PointCloud>& spTarget)
 	{

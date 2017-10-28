@@ -6,15 +6,41 @@
 namespace vis
 {
 
-	/// Fullscreen visualizer that will show various states of the program.
-	/// Calls are non-blocking, and generally quick.
+	///
+	struct ProgressRecord
+	{
+
+		ProgressRecord(
+			const std::shared_ptr<DepthFrame>& spDepthFrame,
+			const boost::shared_ptr<PointCloud>& spSurfaceCloud,
+			const std::shared_ptr<DepthFrame>& spClipFrame,
+			const boost::shared_ptr<PointCloud>& spAlignment,
+			const boost::shared_ptr<ErrorPointCloud>& spErrorCloud
+		);
+
+		std::shared_ptr<DepthFrame> spDepthFrame;
+		boost::shared_ptr<PointCloud> spSurfaceCloud;
+		std::shared_ptr<DepthFrame> spClipFrame;
+		boost::shared_ptr<PointCloud> spAlignment;
+		boost::shared_ptr<ErrorPointCloud> spErrorCloud;
+	};
+
+
+	/// Visualizer that will show various states of the program. Calls are non-blocking, and
+	/// generally quick.
 	class ProgressVisualizer
 	{
+		using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
+
 	public:
 
-		/// Notify that we have begun a new scan
-		void notifyNewScan();
+		/// Get the singleton instance
+		static ProgressVisualizer* get();
 		
+
+		/// Start the visualizer thread
+		void start();
+
 		
 		/// Notify that we have received a new depth frame from the camera
 		/// @param spFrame the frame
@@ -31,9 +57,9 @@ namespace vis
 		void notifyClipFrame(const std::shared_ptr<DepthFrame>& spFrame);
 
 
-		/// Notify that a bounding sphere has been determined or moved 
-		/// @param spShere the bounding sphere
-		void notifyBoundingSphere(const boost::shared_ptr<BoundingSphere>& spSphere);
+		/// Notify that an alignment attempt is in process for the cloud
+		/// @param spCloud the relevant frame
+		void notifyAlignment(const boost::shared_ptr<PointCloud>& spCloud);
 
 
 		/// Notify that an error cloud has been calculated
@@ -41,9 +67,31 @@ namespace vis
 		void notifyErrorCloud(const boost::shared_ptr<ErrorPointCloud>& spCloud);
 
 	private:
+
+		///
+		ProgressVisualizer()
+			: m_visThreadRecord(nullptr, nullptr, nullptr, nullptr, nullptr) {}
+
+
+		///
+		void pushIfNeeded();
+
+
+		///
+		static void updateDisplay(pcl::visualization::PCLVisualizer& visualizer, const ProgressRecord& record);
+
+
 		std::thread m_visualizationThread;
-		std::mutex m_queueLock;
-		std::queue<std::function<void()>> m_RunQueue;
+		std::mutex m_lastUpdateLock;
+		TimePoint m_lastPushTime;
+
+		ProgressRecord m_visThreadRecord;
+		std::shared_ptr<DepthFrame> m_spLastDepthFrame;
+		boost::shared_ptr<PointCloud> m_spLastSurfaceCloud;
+		std::shared_ptr<DepthFrame> m_spLastClipFrame;
+		boost::shared_ptr<PointCloud> m_spLastAlignment;
+		boost::shared_ptr<ErrorPointCloud> m_spLastErrorCloud;
+
 	};
 
 

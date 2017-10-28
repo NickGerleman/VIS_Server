@@ -18,10 +18,11 @@ and https://www.microsoft.com/en-us/download/details.aspx?id=40276.
 
 ### Command Line Arguments
 
-| Switch | Description                                             |
-|--------|---------------------------------------------------------|
-| --oni  | Path to a .ONI file to use instead of a physical camera |
-| --port | The port to listen on                                   |
+| Switch       | Description                                             |
+|--------------|---------------------------------------------------------|
+| --oni        | Path to a .ONI file to use instead of a physical camera |
+| --port       | The port to listen on                                   |
+| --visualizer | Display a visualizer while doing scans                  |
 
 ### SPC Binary Point Clouds
 It is possible to receive any point cloud as a custom binary format called SPC. This is a

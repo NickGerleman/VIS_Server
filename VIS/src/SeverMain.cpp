@@ -31,7 +31,7 @@ void sleepUntilKilled()
 /// Create a context based off of command line arguments
 /// @param commandArgs the command line arguments
 ///
-AppContext createCtx(const opts::variables_map& commandArgs)
+DeviceContext createCtx(const opts::variables_map& commandArgs)
 {
 	// TODO concrete controls
 	if (commandArgs.count("oni"))
@@ -40,7 +40,7 @@ AppContext createCtx(const opts::variables_map& commandArgs)
 		{
 			auto spCamera = MockCamera::make(commandArgs["oni"].as<std::string>(), StructureSensor::cameraIntrinsics());
 			auto spControls = std::make_shared<MockPlatformControls>(spCamera);
-			return AppContext(nullptr, spCamera, spControls);
+			return DeviceContext(spCamera, spControls);
 		}
 		catch (...)
 		{
@@ -54,7 +54,7 @@ AppContext createCtx(const opts::variables_map& commandArgs)
 		try
 		{
 			auto spCamera = StructureSensor::acquireCamera();
-			return AppContext(nullptr, std::move(spCamera), nullptr);
+			return DeviceContext(std::move(spCamera), nullptr);
 		}
 		catch (...)
 		{
@@ -76,7 +76,8 @@ opts::variables_map checkArgs(int argc, char *argv[])
 	opts::options_description description("Allowed Options");
 	description.add_options()
 		("oni",   opts::value<std::string>(),  "Path to an oni file to use as camera data")
-		("port",  opts::value<int>(),          "The HTTP port to listen on");
+		("port", opts::value<int>(), "The HTTP port to listen on")
+		("visualizer", "Display a visualizer while doing scans");
 
 	try
 	{
@@ -105,6 +106,8 @@ int main(int argc, char *argv[])
 
 	auto args = checkArgs(argc, argv);
 	auto ctx = createCtx(args);
+	if (args.count("visualizer"))
+		ProgressVisualizer::get()->start();
 
 	// Start the server
 	int port = args.count("port")

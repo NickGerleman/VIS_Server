@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Geometry.h"
+#include "Visualization.h"
 
 using namespace Eigen;
 
@@ -26,6 +27,7 @@ namespace vis
 			sprayTrianglePoints(spOutputCloud.get(), facePoints, static_cast<int>(numPoints));
 		}
 
+		ProgressVisualizer::get()->notifySurfaceCloud(spOutputCloud);
 		return spOutputCloud;
 	}
 
@@ -323,6 +325,7 @@ namespace vis
 		auto spAlignedCloud = boost::make_shared<PointCloud>();
 		icp.align(*spAlignedCloud);
 		(*spTarget) = *spAlignedCloud;
+		ProgressVisualizer::get()->notifyAlignment(spTarget);
 
 		return spReferenceCloud;
 	}

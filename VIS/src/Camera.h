@@ -40,6 +40,8 @@ namespace vis
 
 		virtual ~DepthFrame() = default;
 
+		/// Create a deep copy of the depth frame
+		virtual std::shared_ptr<DepthFrame> clone() = 0;
 
 		/// Build a point cloud from the depth frame (with 1M units)
 		virtual boost::shared_ptr<PointCloud> generatePointCloud() = 0;
@@ -88,6 +90,7 @@ namespace vis
 		
 		OpenNIFrame(const OpenNIFrame& otherFrame) = default;
 
+		std::shared_ptr<DepthFrame> clone() override;
 		boost::shared_ptr<PointCloud> generatePointCloud() override;
 		std::shared_ptr<DepthFrame> clipFrame(const ClipCube& clipCube) override;
 		std::unique_ptr<NUI_FUSION_IMAGE_FRAME, FusionFrameDeleter> convertToFusionFrame() override;

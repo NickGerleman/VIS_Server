@@ -94,7 +94,7 @@ namespace vis
 	}
 
 
-	void HttpRoute::handle(const http_request& request, const AppContext& ctx)
+	void HttpRoute::handle(const http_request& request, const DeviceContext& ctx)
 	{
 		m_handler(request, ctx);
 	}

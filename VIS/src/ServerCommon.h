@@ -25,23 +25,17 @@ namespace vis
 
 
 	/// Context to app-wide resources
-	class AppContext
+	class DeviceContext
 	{
 	public:
 
 		/// Build the context
-		AppContext(
-			const std::shared_ptr<ProgressVisualizer>& spVisualizer,
+		DeviceContext(
 			const std::shared_ptr<ICamera>& spCamera,
 			const std::shared_ptr<IPlatformControls>& spPlatControls
 		)
-			: m_spVisualizer(spVisualizer)
-			, m_spCamera(spCamera)
+			: m_spCamera(spCamera)
 			, m_spPlatControls(spPlatControls) {}
-
-
-		/// Get the app-wide visualizer
-		ProgressVisualizer* const getVisualizer() const { return m_spVisualizer.get(); }
 
 
 		/// Get the app-wide camera instance
@@ -62,7 +56,7 @@ namespace vis
 	class HttpRoute
 	{
 	public:
-		using Handler = std::function<void(const web::http::http_request&, const AppContext&)>;
+		using Handler = std::function<void(const web::http::http_request&, const DeviceContext&)>;
 
 
 		/// Create a route binding the path and action
@@ -83,7 +77,7 @@ namespace vis
 
 		/// Call the bound action
 		/// @param request the associated request
-		void handle(const web::http::http_request& request, const AppContext& ctx);
+		void handle(const web::http::http_request& request, const DeviceContext& ctx);
 
 
 	private:
@@ -97,13 +91,13 @@ namespace vis
 	class AppServer
 	{
 	public:
-		AppServer(const AppContext* pAppContext)
+		AppServer(const DeviceContext* pAppContext)
 			: m_pAppContext(pAppContext) {}
 
 		void operator()(const web::http::http_request& request);
 
 	private:
 		static std::vector<HttpRoute> s_routes;
-		const AppContext* m_pAppContext;
+		const DeviceContext* m_pAppContext;
 	};
 }

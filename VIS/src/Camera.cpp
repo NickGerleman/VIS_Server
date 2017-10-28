@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Camera.h"
+#include "Visualization.h"
 
 using namespace openni;
 
@@ -56,6 +57,12 @@ namespace vis
 		const uint16_t* depthData = static_cast<const uint16_t*>(depthFrame.getData());
 		size_t numPixels = this->width() * this->height();
 		m_depthPixels.insert(m_depthPixels.begin(), depthData, depthData + numPixels);
+	}
+
+
+	std::shared_ptr<DepthFrame> OpenNIFrame::clone()
+	{
+		return std::make_shared<OpenNIFrame>(*this);
 	}
 
 
@@ -166,7 +173,10 @@ namespace vis
 		if (m_spDepthStream->readFrame(&niFrame) != Status::STATUS_OK)
 			throw std::runtime_error(OpenNI::getExtendedError());
 
-		return std::make_shared<OpenNIFrame>(niFrame, m_spDepthStream, m_pCameraParams);
+		auto spFrame = std::make_shared<OpenNIFrame>(niFrame, m_spDepthStream, m_pCameraParams);
+		ProgressVisualizer::get()->notifyDepthFrame(spFrame);
+
+		return spFrame;
 	}
 
 
