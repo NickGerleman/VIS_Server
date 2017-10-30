@@ -5,6 +5,7 @@
 #include "Geometry.h"
 #include "MeshIO.h"
 #include "ServerCommon.h"
+#include "PlatformControls.h"
 
 using namespace boost;
 using namespace web;
@@ -13,6 +14,7 @@ namespace fs = filesystem;
 
 namespace vis
 {
+	ServoPlatformControls spc(new Serial("\\\\.\\COM4"));
 
 	std::vector<HttpRoute> AppServer::s_routes
 	{
@@ -28,6 +30,13 @@ namespace vis
 		// We only want one client to be able to do scanning/rotation at once
 		static std::mutex scanMutex;
 		std::lock_guard<std::mutex> scanLock(scanMutex);
+
+		// Rotate the platform if connected
+		spc.startRotation();
+
+		// Wait for the platform to finish rotating if it started
+		while (spc.isRotating())
+		{ }
 
 		// For now, use our mock data to generate an error cloud
 		auto spIdealMesh = tryLoadBinaryStlFile("models/cube.stl");

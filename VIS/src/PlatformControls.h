@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Camera.h"
+#include "Serial.h"
 
 namespace vis
 {
@@ -40,6 +41,19 @@ namespace vis
 
 	private:
 		std::shared_ptr<MockCamera> m_spMockCamera;
+	};
+
+	class ServoPlatformControls : public IPlatformControls
+	{
+	public:
+		ServoPlatformControls(Serial* SP) 
+			: m_SP(SP) {}
+
+		void startRotation() override;
+		bool isRotating() override;
+		bool isConnected();
+	private:
+			Serial* m_SP;
 	};
 
 }
