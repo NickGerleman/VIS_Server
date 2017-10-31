@@ -6,7 +6,7 @@
 namespace vis
 {
 
-	///
+	/// Logically immutable record of various states of progress
 	struct ProgressRecord
 	{
 
@@ -26,8 +26,11 @@ namespace vis
 	};
 
 
-	/// Visualizer that will show various states of the program. Calls are non-blocking, and
-	/// generally quick.
+	/// Visualizer that will show various states of the program. Calls are non-blocking,
+	/// and generally quick. The actual vizualization happens on its own thread, and is
+	/// currently horribly inefficient to a noticeable degree. Work should be done on
+	/// reducing unneeded sorts and to not recompute colored clouds on each loop
+	/// iteration.
 	class ProgressVisualizer
 	{
 		using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
@@ -41,7 +44,11 @@ namespace vis
 		/// Start the visualizer thread
 		void start();
 
-		
+
+		/// Notify that a new scan has started and that we should clear our viewports
+		void notifyNewScan();
+
+
 		/// Notify that we have received a new depth frame from the camera
 		/// @param spFrame the frame
 		void notifyDepthFrame(const std::shared_ptr<DepthFrame>& spFrame);
@@ -68,41 +75,102 @@ namespace vis
 
 	private:
 
-		///
 		ProgressVisualizer()
-			: m_visThreadRecord(nullptr, nullptr, nullptr, nullptr, nullptr) {}
+			: m_vizThreadRecord
+			(
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr,
+				nullptr
+			) {}
 
 
-		///
+		/// Create viewports and add pointclouds to them
+		void initViewports();
+
+
+		/// Copy our current progress to a progress record for the visualization thread
+		/// to read
 		void pushIfNeeded();
 
 
-		///
-		static void updateDisplay(pcl::visualization::PCLVisualizer& visualizer, const ProgressRecord& record);
+		/// Update the displayed point clouds based on the current record
+		void updateDisplay();
+		void updateDepthFrameView();
+		void updateClipFrameView();
+		void updateSurfaceCloudView();
+		void updateAlignmentView();
+		void updateErrorView();
+		void updateText();
 
+
+		/// Place the caemra in a viewport such that the point cloud is centered and
+		/// fully visible
+		/// @param viewport the viewport number
+		/// @param cloud the pointcloud in the viewport
+		template <typename TCloud>
+		void fitCameraToCloud(int viewport, const TCloud& cloud);
 
 		std::thread m_visualizationThread;
 		std::mutex m_lastUpdateLock;
 		TimePoint m_lastPushTime;
+		std::unique_ptr<pcl::visualization::PCLVisualizer> m_spVisualizer;
+		ProgressRecord m_vizThreadRecord;
 
-		ProgressRecord m_visThreadRecord;
-		std::shared_ptr<DepthFrame> m_spLastDepthFrame;
 		boost::shared_ptr<PointCloud> m_spLastSurfaceCloud;
-		std::shared_ptr<DepthFrame> m_spLastClipFrame;
-		boost::shared_ptr<PointCloud> m_spLastAlignment;
-		boost::shared_ptr<ErrorPointCloud> m_spLastErrorCloud;
+		int m_surfaceCloudViewport;
 
+		std::shared_ptr<DepthFrame> m_spLastDepthFrame;
+		int m_depthFrameViewport;
+
+		std::shared_ptr<DepthFrame> m_spLastClipFrame;
+		int m_clipFrameViewport;
+
+		// TODO implement reconstruction viewport
+		int m_reconstructionViewport;
+
+		boost::shared_ptr<PointCloud> m_spLastAlignment;
+		int m_alignmentViewport;
+
+		boost::shared_ptr<ErrorPointCloud> m_spLastErrorCloud;
+		int m_errorViewport;
 	};
 
+	
+	/// Create coloring to show depth on a point cloud
+	/// @param cloud the cloud with depth information
+	boost::shared_ptr<ColorPointCloud> colorDepthCloud(
+		const PointCloud& cloud,
+		const Eigen::Vector3f& closeColor = Eigen::Vector3f(0.8f, 0.8f, 0.8f),
+		const Eigen::Vector3f& farColor = Eigen::Vector3f(0.2f, 0.2f, 0.2f)
+	);
 
-	/// Create a visualizer showing the alignment between two point clouds
-	/// @param spReference the reference cloud, shown in white
-	/// @param spTarget the target, shown in blue
-	std::shared_ptr<pcl::visualization::PCLVisualizer> createAlignmentVisualizer(const boost::shared_ptr<PointCloud>& spReference, const boost::shared_ptr<PointCloud>& spTarget);
+
+	/// Create a colored point by linearly interpolating between two colors
+	/// @param minColor the color corresponding to the minimum value
+	/// @param maxColor the color corresponding to the max value
+	/// @param minValue the minimum value for the gradient
+	/// @param maxValue the maximum value for the gradient
+	/// @param point the point whose coordinates will be used
+	/// @param the value of the point to use for coloring, will be clamped to be between min
+	///        and max
+	static pcl::PointXYZRGB colorPoint(
+		const Eigen::Vector3f& minColor,
+		const Eigen::Vector3f& maxColor,
+		float minValue,
+		float maxValue,
+		pcl::PointXYZ point,
+		float pointValue);
 
 
-	/// Create a visualizer showing the relative error in an error cloud (in red)
-	/// @param cloud the error cloud
-	std::shared_ptr<pcl::visualization::PCLVisualizer> createErrorVisualizer(const ErrorPointCloud& cloud);
+	/// Find a point in a pointcloud at a normalized position given sorted order. This is
+	/// super inefficient and should be removed eventually.
+	/// @param cloud the point cloud
+	/// @param samplePlace a number between 0 and 1 corresponding to the place to sample the
+	///        cloud
+	/// @param compare a comparison functor used for sorting
+	template <typename TPoint, typename TComp>
+	static TPoint samplePoint(const pcl::PointCloud<TPoint>& cloud, double samplePlace, TComp compare);
 
 }
