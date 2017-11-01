@@ -161,7 +161,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Serial.cpp" />
+    <ClCompile Include="src\Serial.cpp" />
     <ClCompile Include="src\Camera.cpp" />
     <ClCompile Include="src\ErrorDetection.cpp" />
     <ClCompile Include="src\Geometry.cpp" />
@@ -186,7 +186,7 @@
     <ClInclude Include="lib\miniball\Subspan-inl.h" />
     <ClInclude Include="lib\miniball\Subspan.h" />
     <ClInclude Include="lib\TinyObjLoader.h" />
-    <ClInclude Include="Serial.h" />
+    <ClInclude Include="src\Serial.h" />
     <ClInclude Include="src\Camera.h" />
     <ClInclude Include="src\ErrorDetection.h" />
     <ClInclude Include="src\Geometry.h" />
