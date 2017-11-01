@@ -6,6 +6,7 @@
 #include "MeshIO.h"
 #include "ServerCommon.h"
 #include "Visualization.h"
+#include "Serial.h"
 
 using namespace boost;
 using namespace web;
