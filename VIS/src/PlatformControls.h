@@ -43,17 +43,17 @@ namespace vis
 		std::shared_ptr<MockCamera> m_spMockCamera;
 	};
 
+	/// Servo platform controls used to rotate the platform through a serial port
 	class ServoPlatformControls : public IPlatformControls
 	{
 	public:
-		ServoPlatformControls(Serial* SP) 
-			: m_SP(SP) {}
+		ServoPlatformControls(Serial* pserialPort) 
+			: m_pserialPort(pserialPort) {}
 
 		void startRotation() override;
 		bool isRotating() override;
-		bool isConnected();
 	private:
-			Serial* m_SP;
+			Serial* m_pserialPort;
 	};
 
 }
