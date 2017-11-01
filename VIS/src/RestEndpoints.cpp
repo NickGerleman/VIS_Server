@@ -5,8 +5,8 @@
 #include "Geometry.h"
 #include "MeshIO.h"
 #include "ServerCommon.h"
-#include "PlatformControls.h"
 #include "Visualization.h"
+#include "PlatformControls.h"
 
 using namespace boost;
 using namespace web;
