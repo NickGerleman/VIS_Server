@@ -30,7 +30,6 @@ void sleepUntilKilled()
 /// @param commandArgs the command line arguments
 DeviceContext createCtx(const opts::variables_map& commandArgs)
 {
-	// TODO concrete controls
 	if (commandArgs.count("oni"))
 	{
 		try
@@ -46,19 +45,29 @@ DeviceContext createCtx(const opts::variables_map& commandArgs)
 			std::exit(EXIT_FAILURE);
 		}
 	}
-	else
+	else if (commandArgs.count("com"))
 	{
 		try
 		{
+			std::stringstream comPort;
+			comPort << "\\\\.\\COM" << commandArgs["com"].as<int>();
+			auto spControls = std::make_shared<ServoPlatformControls>(comPort.str());
+
 			auto spCamera = StructureSensor::acquireCamera();
-			return DeviceContext(std::move(spCamera), nullptr);
+			return DeviceContext(std::move(spCamera), spControls);
 		}
-		catch (...)
+		catch (const std::exception& ex)
 		{
-			std::cerr << "Error: Camera is not connected" << std::endl;
+			std::cerr << "Error: Could not connect to Camera or Platform" << std::endl;
+			std::cerr << "Exception: " << ex.what() << std::endl;
 			sleepUntilKilled();
 			std::exit(EXIT_FAILURE);
 		}
+	}
+	else
+	{
+		std::cerr << "--com option must be present when using a physical camera";
+		std::exit(EXIT_FAILURE);
 	}
 }
 
@@ -72,6 +81,7 @@ opts::variables_map checkArgs(int argc, char *argv[])
 	description.add_options()
 		("oni",   opts::value<std::string>(),  "Path to an oni file to use as camera data")
 		("port", opts::value<int>(), "The HTTP port to listen on")
+		("com", opts::value<int>(), "The COM port number to use for platform rotation, unneeded if using a file")
 		("visualizer", "Display a visualizer while doing scans");
 
 	try

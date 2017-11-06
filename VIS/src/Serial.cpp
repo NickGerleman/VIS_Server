@@ -7,10 +7,10 @@ namespace vis
 	Serial::Serial(const char *portName)
 	{
 		// We're not yet connected
-		this->m_connected = false;
+		m_connected = false;
 
 		// Try to connect to the given port throuh CreateFile
-		this->m_serialHandler = CreateFileA(portName,
+		m_serialHandler = CreateFileA(portName,
 			GENERIC_READ | GENERIC_WRITE,
 			0,
 			NULL,
@@ -19,18 +19,14 @@ namespace vis
 			NULL);
 
 		// Check if the connection was successfull
-		if (this->m_serialHandler == INVALID_HANDLE_VALUE)
+		if (m_serialHandler == INVALID_HANDLE_VALUE)
 		{
 			// If not success full display an Error
 			if (GetLastError() == ERROR_FILE_NOT_FOUND) {
-
-				throw std::runtime_error("ERROR: Handle was not attached. Reason: " + std::string(portName) + " not available.\n" );
-
+				throw std::runtime_error("Handle was not attached. Reason: " + std::string(portName) + " not available.\n" );
 			}
 			else
-			{
-				throw std::runtime_error("ERROR!!!");
-			}
+				throw std::runtime_error("Unknown Error");
 		}
 		else
 		{
@@ -38,10 +34,10 @@ namespace vis
 			DCB dcbSerialParams = { 0 };
 
 			// Try to get the current
-			if (!GetCommState(this->m_serialHandler, &dcbSerialParams))
+			if (!GetCommState(m_serialHandler, &dcbSerialParams))
 			{
 				// If impossible, show an error
-				throw std::runtime_error("failed to get current serial parameters!");
+				throw std::runtime_error("Failed to get current serial parameters!");
 			}
 			else
 			{
@@ -57,14 +53,14 @@ namespace vis
 				// Set the parameters and check for their proper application
 				if (!SetCommState(m_serialHandler, &dcbSerialParams))
 				{
-					throw std::runtime_error("ALERT: Could not set Serial Port parameters");
+					throw std::runtime_error("Could not set Serial Port parameters");
 				}
 				else
 				{
 					// If everything went fine we're connected
-					this->m_connected = true;
+					m_connected = true;
 					// Flush any remaining characters in the buffers 
-					PurgeComm(this->m_serialHandler, PURGE_RXCLEAR | PURGE_TXCLEAR);
+					PurgeComm(m_serialHandler, PURGE_RXCLEAR | PURGE_TXCLEAR);
 				}
 			}
 		}
@@ -74,12 +70,12 @@ namespace vis
 	Serial::~Serial()
 	{
 		// Check if we are connected before trying to disconnect
-		if (this->m_connected)
+		if (m_connected)
 		{
 			// We're no longer connected
-			this->m_connected = false;
+			m_connected = false;
 			// Close the serial handler
-			CloseHandle(this->m_serialHandler);
+			CloseHandle(m_serialHandler);
 		}
 	}
 
@@ -91,28 +87,22 @@ namespace vis
 		unsigned int toRead;
 
 		// Use the ClearCommError function to get status info on the Serial port
-		ClearCommError((this->m_serialHandler), &(this->m_errors), &(this->m_status));
+		ClearCommError((m_serialHandler), &(m_errors), &(m_status));
 
 		// Check if there is something to read
-		if (this->m_status.cbInQue > 0)
+		if (m_status.cbInQue > 0)
 		{
 			// If there is we check if there is enough data to read the required number
 			// of characters, if not we'll read only the available characters to prevent
 			// locking of the application.
-			if (this->m_status.cbInQue > nbChar)
-			{
+			if (m_status.cbInQue > nbChar)
 				toRead = nbChar;
-			}
 			else
-			{
-				toRead = this->m_status.cbInQue;
-			}
+				toRead = m_status.cbInQue;
 
 			// Try to read the require number of chars, and return the number of read bytes on success
-			if (ReadFile(this->m_serialHandler, buffer, toRead, &bytesRead, NULL))
-			{
+			if (ReadFile(m_serialHandler, buffer, toRead, &bytesRead, NULL))
 				return bytesRead;
-			}
 
 		}
 
@@ -127,10 +117,10 @@ namespace vis
 		DWORD bytesSend;
 
 		// Try to write the buffer on the Serial port
-		if (!WriteFile(this->m_serialHandler, (void *)buffer, nbChar, &bytesSend, 0))
+		if (!WriteFile(m_serialHandler, (void *)buffer, nbChar, &bytesSend, 0))
 		{
 			// In case it don't work get comm error and return false
-			ClearCommError(this->m_serialHandler, &this->m_errors, &this->m_status);
+			ClearCommError(m_serialHandler, &m_errors, &m_status);
 
 			return false;
 		}
@@ -141,7 +131,7 @@ namespace vis
 	bool Serial::isConnected()
 	{
 		// Simply return the connection status
-		return this->m_connected;
+		return m_connected;
 	}
 
 }

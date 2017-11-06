@@ -47,13 +47,13 @@ namespace vis
 	class ServoPlatformControls : public IPlatformControls
 	{
 	public:
-		ServoPlatformControls(Serial* pserialPort)
-			: m_pserialPort(pserialPort) {}
+		ServoPlatformControls(const std::string& portName)
+			: m_serialPort(portName.c_str()) {}
 
 		void startRotation() override;
 		bool isRotating() override;
 	private:
-			Serial* m_pserialPort;
+			Serial m_serialPort;
 	};
 
 }
