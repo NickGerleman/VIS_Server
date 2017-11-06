@@ -252,6 +252,7 @@ namespace vis
 	void MockCamera::startFullLoop()
 	{
 		m_static = false;
+		m_pControls->seek(*m_spDepthStream, 0);
 		m_curFrame = 0;
 	}
 
