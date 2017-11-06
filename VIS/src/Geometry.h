@@ -5,6 +5,7 @@ namespace vis
 
 	using Mesh = pcl::geometry::TriangleMesh<pcl::geometry::DefaultMeshTraits<pcl::PointXYZ>>;
 	using PointCloud = pcl::PointCloud<pcl::PointXYZ>;
+	using ColorPointCloud = pcl::PointCloud<pcl::PointXYZRGB>;
 	using ErrorPointCloud = pcl::PointCloud<pcl::PointXYZI>;
 
 	/// The bounding sphere of a point cloud

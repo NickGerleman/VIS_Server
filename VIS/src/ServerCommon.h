@@ -2,10 +2,12 @@
 
 #include "Geometry.h"
 #include "PlatformControls.h"
-#include "Visualization.h"
 
 namespace vis
 {
+
+	class ProgressVisualizer;
+
 
 	/// Ensure that the model directory exists, creating it if neccesary. Returns
 	/// the path to this directory

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "ServerCommon.h"
+#include "Visualization.h"
 
 using namespace vis;
 using namespace web;

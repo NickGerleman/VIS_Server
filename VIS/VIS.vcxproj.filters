@@ -27,9 +27,6 @@
     <ClCompile Include="src\ErrorDetection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Visualization.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\SeverMain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -96,9 +93,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\ErrorDetection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Visualization.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\RestEndpoints.h">
