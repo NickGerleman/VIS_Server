@@ -9,14 +9,6 @@ namespace vis
 		// We're not yet connected
 		this->m_connected = false;
 
-		try 
-		{
-
-		}
-		catch (std::exception &e)
-		{
-
-		}
 		// Try to connect to the given port throuh CreateFile
 		this->m_serialHandler = CreateFileA(portName,
 			GENERIC_READ | GENERIC_WRITE,
@@ -37,7 +29,7 @@ namespace vis
 			}
 			else
 			{
-				printf("ERROR!!!");
+				throw std::runtime_error("ERROR!!!");
 			}
 		}
 		else
@@ -49,7 +41,7 @@ namespace vis
 			if (!GetCommState(this->m_serialHandler, &dcbSerialParams))
 			{
 				// If impossible, show an error
-				printf("failed to get current serial parameters!");
+				throw std::runtime_error("failed to get current serial parameters!");
 			}
 			else
 			{
