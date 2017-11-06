@@ -53,7 +53,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <Shlobj.h>
-#include <NuiApi.h>
 #include <NuiKinectFusionApi.h>
 
 #pragma warning(pop)

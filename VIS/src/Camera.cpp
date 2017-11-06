@@ -14,25 +14,53 @@ namespace vis
 			throw std::runtime_error(OpenNI::getExtendedError());
 	}
 
-	ClipCube::ClipCube(const Eigen::Matrix4f& referenceTransform)
-		: m_inverseTransform(referenceTransform.inverse()) {}
 
-
-	bool ClipCube::intersects(const pcl::PointXYZ& point) const
+	void FusionFrameDeleter::operator()(NUI_FUSION_IMAGE_FRAME* pFrame) const
 	{
-		auto relativeCoords = relativeCoordinate(point);
-		return relativeCoords.x >= -0.5
-			&& relativeCoords.x <= 0.5
-			&& relativeCoords.y >= -0.5
-			&& relativeCoords.y <= 0.5
-			&& relativeCoords.z >= -0.5
-			&& relativeCoords.z <= 0.5;
+		if (!SUCCEEDED(NuiFusionReleaseImageFrame(pFrame)))
+			throw std::runtime_error("Could not free fusion frame");
 	}
 
 
-	pcl::PointXYZ ClipCube::relativeCoordinate(const pcl::PointXYZ& point) const
+	ClipVolume::ClipVolume(const Eigen::Matrix4f& referenceTransform)
+		: m_inverseTransform(referenceTransform.inverse())
 	{
-		Eigen::Vector4f transformed = m_inverseTransform * Eigen::Vector4f(point.x, point.y, point.z, 1.0);
+		// Normalize scale of each dimension before coordinate transforms so that our
+		// pointcloud isn't distorted
+		Eigen::Matrix4f uniformMat(referenceTransform);
+		
+		float scaleX = Eigen::Vector3f(referenceTransform(0, 0), referenceTransform(1, 0), referenceTransform(2, 0)).norm();
+	    float scaleY = Eigen::Vector3f(referenceTransform(0, 1), referenceTransform(1, 1), referenceTransform(2, 1)).norm();
+		float scaleZ = Eigen::Vector3f(referenceTransform(0, 2), referenceTransform(1, 2), referenceTransform(2, 2)).norm();
+		float scaleNorm = std::max({ scaleX, scaleY, scaleZ });
+		
+		for (int row = 0; row < 3; row++)
+		{
+			uniformMat(row, 0) *= (scaleNorm / scaleX);
+			uniformMat(row, 1) *= (scaleNorm / scaleY);
+			uniformMat(row, 2) *= (scaleNorm / scaleZ);
+		}
+
+		m_dimensions = Eigen::Vector3f(scaleX, scaleY, scaleZ);
+		m_uniformInverseTransform = uniformMat.inverse();
+	}
+
+
+	bool ClipVolume::intersects(const pcl::PointXYZ& point) const
+	{
+		Eigen::Vector4f relativeCoords = m_inverseTransform * Eigen::Vector4f(point.x, point.y, point.z, 1.0);
+		return relativeCoords.x() >= -0.5
+			&& relativeCoords.x() <= 0.5
+			&& relativeCoords.y() >= -0.5
+			&& relativeCoords.y() <= 0.5
+			&& relativeCoords.z() >= -0.5
+			&& relativeCoords.z() <= 0.5;
+	}
+
+
+	pcl::PointXYZ ClipVolume::relativeCoordinate(const pcl::PointXYZ& point) const
+	{
+		Eigen::Vector4f transformed = m_uniformInverseTransform * Eigen::Vector4f(point.x, point.y, point.z, 1.0);
 		return { transformed.x(), transformed.y(), transformed.z() };
 	}
 
@@ -66,13 +94,13 @@ namespace vis
 	}
 
 
-	boost::shared_ptr<PointCloud> OpenNIFrame::generatePointCloud()
+	boost::shared_ptr<PointCloud> OpenNIFrame::generatePointCloud(int sampleStep)
 	{
 		auto spCloud = boost::make_shared<PointCloud>();
 		
-		for (int y = 0; y < this->height(); y++)
+		for (int y = 0; y < this->height(); y += sampleStep)
 		{
-			for (int x = 0; x < this->width(); x++)
+			for (int x = 0; x < this->width(); x += sampleStep)
 			{
 				auto worldPt = worldPtFromPixel(x, y);
 				if (worldPt)
@@ -84,7 +112,7 @@ namespace vis
 	}
 
 
-	std::shared_ptr<DepthFrame> OpenNIFrame::clipFrame(const ClipCube& clipCube)
+	std::shared_ptr<DepthFrame> OpenNIFrame::clipFrame(const std::shared_ptr<ClipVolume>& spClipVolume)
 	{
 		auto spClippedFrame = std::make_shared<OpenNIFrame>(*this);
 
@@ -93,16 +121,17 @@ namespace vis
 			for (int x = 0; x < this->width(); x++)
 			{
 				auto worldPt = worldPtFromPixel(x, y);
-				if (!(worldPt && clipCube.intersects(worldPt.get())))
-					(*spClippedFrame).m_depthPixels[(y * height()) + width()] = 0;
+				if (!(worldPt && spClipVolume->intersects(worldPt.get())))
+					(*spClippedFrame).m_depthPixels[(y * width()) + x] = 0;
 			}
 		}
 
+		ProgressVisualizer::get()->notifyClipFrame(spClippedFrame, spClipVolume);
 		return spClippedFrame;
 	}
 
 
-	std::unique_ptr<NUI_FUSION_IMAGE_FRAME, DepthFrame::FusionFrameDeleter> OpenNIFrame::convertToFusionFrame()
+	FusionFramePtr OpenNIFrame::convertToFusionFrame()
 	{
 		NUI_FUSION_IMAGE_FRAME* pFrame;
 		
@@ -112,30 +141,19 @@ namespace vis
 		if (!SUCCEEDED(hr))
 			throw std::runtime_error("NuiFusionCreateImageFrame failed");
 
-		// Convert to Kinect depth pixel format
-		std::vector<NUI_DEPTH_IMAGE_PIXEL> kinectDepthPixels(m_depthPixels.size());
-		for (uint16_t depth : m_depthPixels)
-			kinectDepthPixels.push_back({0, depth});
-
 		hr = NuiFusionDepthToDepthFloatFrame(
-			kinectDepthPixels.data(),
+			m_depthPixels.data(),
 			width(),
 			height(),
 			pFrame,
 			NUI_FUSION_DEFAULT_MINIMUM_DEPTH,
 			NUI_FUSION_DEFAULT_MAXIMUM_DEPTH,
-			false /*mirrorDepth*/);
+			true /*mirrorDepth*/);
 
 		if (!SUCCEEDED(hr))
 			throw std::runtime_error("NuiFusionDepthToDepthFloatFrame failed");
 
-		auto freeFrame = [](NUI_FUSION_IMAGE_FRAME* pFrame)
-		{
-			if (!SUCCEEDED(NuiFusionReleaseImageFrame(pFrame)))
-				throw std::runtime_error("Failed to free image data");
-		};
-
-		return std::unique_ptr<NUI_FUSION_IMAGE_FRAME, FusionFrameDeleter>(pFrame, freeFrame);
+		return FusionFramePtr(pFrame);
 	}
 
 
@@ -148,8 +166,7 @@ namespace vis
 			return boost::none;
 
 		pcl::PointXYZ worldPt;
-		if (CoordinateConverter::convertDepthToWorld(*m_spDepthStream, x, y, depth, &worldPt.x, &worldPt.y, &worldPt.z) != Status::STATUS_OK)
-			throw std::runtime_error(OpenNI::getExtendedError());
+		assertNI(CoordinateConverter::convertDepthToWorld(*m_spDepthStream, x, y, depth, &worldPt.x, &worldPt.y, &worldPt.z));
 
 		// Convert to meters in right-hand coordinate system
 		worldPt.x /= 1000;
@@ -270,19 +287,16 @@ namespace vis
 
 	const NUI_FUSION_CAMERA_PARAMETERS* StructureSensor::cameraIntrinsics()
 	{
-		static NUI_FUSION_CAMERA_PARAMETERS* pParams = nullptr;
-
-		if (pParams == nullptr)
+		// Taken from https://forums.structure.io/t/intrinsics-for-ios-devices-and-the-structure-sensor-depth-point-cloud-info/4640
+		const static NUI_FUSION_CAMERA_PARAMETERS params
 		{
-			// Taken from https://forums.structure.io/t/intrinsics-for-ios-devices-and-the-structure-sensor-depth-point-cloud-info/4640
-			pParams = new NUI_FUSION_CAMERA_PARAMETERS;
-			pParams->focalLengthX = 0.909375f;
-			pParams->focalLengthY = 1.2125f;
-			pParams->principalPointX = 0.5;
-			pParams->principalPointY = 0.5;
-		}
+			0.909375f, /*focalLengthX*/ 
+			1.2125f,   /*focalLengthY*/
+			0.5f,      /*principalPointX*/
+			0.5f       /*principalPointY*/
+		};
 
-		return pParams;
+		return &params;
 	}
 
 }

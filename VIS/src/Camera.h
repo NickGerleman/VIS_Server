@@ -5,16 +5,24 @@
 namespace vis
 {
 
-	/// Clipping cube of arbitraty translation and rotation used to isolate objects in a
-	/// scene
-	class ClipCube
+	/// Functor to release a NUI_FUSION_IMAGE_FRAME
+	struct FusionFrameDeleter
+	{
+		void operator()(NUI_FUSION_IMAGE_FRAME* pFrame) const;
+	};
+
+	using FusionFramePtr = std::unique_ptr<NUI_FUSION_IMAGE_FRAME, FusionFrameDeleter>;
+
+	/// Clipping volume of arbitraty translation and rotation used to isolate
+	/// objects in a scene
+	class ClipVolume
 	{
 	public:
 		
 		/// Build the clip cube using a transform to a reference 1x1 cube centered at
 		/// the origin
 		/// @param referenceTransform the transform to achieve the cube position
-		ClipCube(const Eigen::Matrix4f& referenceTransform);
+		ClipVolume(const Eigen::Matrix4f& referenceTransform);
 
 
 		/// Whether the given point is inside of the cube
@@ -26,9 +34,14 @@ namespace vis
 		/// @param point the point in world space
 		pcl::PointXYZ relativeCoordinate(const pcl::PointXYZ& point) const;
 
+
+		/// X, Y, and Z lengths representing the size of the volume
+		Eigen::Vector3f dimensions() { return m_dimensions; }
+
 	private:
 		Eigen::Matrix4f m_inverseTransform;
-
+		Eigen::Matrix4f m_uniformInverseTransform;
+		Eigen::Vector3f m_dimensions;
 	};
 
 
@@ -36,15 +49,13 @@ namespace vis
 	class DepthFrame
 	{
 	public:
-		using FusionFrameDeleter = void(*)(NUI_FUSION_IMAGE_FRAME*);
-
 		virtual ~DepthFrame() = default;
 
 		/// Create a deep copy of the depth frame
 		virtual std::shared_ptr<DepthFrame> clone() = 0;
 
 		/// Build a point cloud from the depth frame (with 1M units)
-		virtual boost::shared_ptr<PointCloud> generatePointCloud() = 0;
+		virtual boost::shared_ptr<PointCloud> generatePointCloud(int sampleStep = 1) = 0;
 
 
 		/// Width of the frame in pixels
@@ -56,13 +67,13 @@ namespace vis
 
 
 		/// Clip the depth frame such that it only contains points within the cube
-		/// @param clipCube the cube to clip to
-		virtual std::shared_ptr<DepthFrame> clipFrame(const ClipCube& clipCube) = 0;
+		/// @param clipVolume the cube to clip to
+		virtual std::shared_ptr<DepthFrame> clipFrame(const std::shared_ptr<ClipVolume>& spClipVolume) = 0;
 		
 
 		/// Convert the frame into a KinectFusion depth float frame (in 1M units).
 		/// Release must be called on the underlying texture after use.
-		virtual std::unique_ptr<NUI_FUSION_IMAGE_FRAME, FusionFrameDeleter> convertToFusionFrame() = 0;
+		virtual FusionFramePtr convertToFusionFrame() = 0;
 
 
 	protected:
@@ -91,9 +102,9 @@ namespace vis
 		OpenNIFrame(const OpenNIFrame& otherFrame) = default;
 
 		std::shared_ptr<DepthFrame> clone() override;
-		boost::shared_ptr<PointCloud> generatePointCloud() override;
-		std::shared_ptr<DepthFrame> clipFrame(const ClipCube& clipCube) override;
-		std::unique_ptr<NUI_FUSION_IMAGE_FRAME, FusionFrameDeleter> convertToFusionFrame() override;
+		boost::shared_ptr<PointCloud> generatePointCloud(int sampleStep) override;
+		std::shared_ptr<DepthFrame> clipFrame(const std::shared_ptr<ClipVolume>& spClipVolume) override;
+		FusionFramePtr convertToFusionFrame() override;
 
 	private:
 		

@@ -12,9 +12,7 @@ namespace opts = boost::program_options;
 
 const int DEFAULT_PORT = 8080;
 
-///
 /// Sleep the thread until we are signaled to be interrupted or terminated
-///
 void sleepUntilKilled()
 {
 	static std::mutex interruptMutex;
@@ -28,10 +26,8 @@ void sleepUntilKilled()
 }
 
 
-///
 /// Create a context based off of command line arguments
 /// @param commandArgs the command line arguments
-///
 DeviceContext createCtx(const opts::variables_map& commandArgs)
 {
 	// TODO concrete controls
@@ -67,11 +63,9 @@ DeviceContext createCtx(const opts::variables_map& commandArgs)
 }
 
 
-///
 /// Check that arguments are valid, parsing them or killing the app
 /// @param argc arg count
 /// @param argv argument values
-///
 opts::variables_map checkArgs(int argc, char *argv[])
 {
 	opts::options_description description("Allowed Options");

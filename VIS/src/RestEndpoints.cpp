@@ -4,6 +4,7 @@
 #include "ErrorDetection.h"
 #include "Geometry.h"
 #include "MeshIO.h"
+#include "Reconstruction.h"
 #include "ServerCommon.h"
 #include "Visualization.h"
 
@@ -26,26 +27,55 @@ namespace vis
 
 	void scanObject(const web::http::http_request& request, const DeviceContext& ctx)
 	{
-		// We only want one client to be able to do scanning/rotation at once
+		ProgressVisualizer::get()->notifyNewScan();
+
+		// Platform rotation is not thread-safe
 		static std::mutex scanMutex;
 		std::lock_guard<std::mutex> scanLock(scanMutex);
 
-		// For now, use our mock data to generate an error cloud
-		auto spIdealMesh = tryLoadBinaryStlFile("models/cube.stl");
-		auto spCaptureMesh = tryLoadBinaryStlFile("captures/cubert_realsense.stl");
-		auto spCaptureCloud = boost::make_shared<vis::PointCloud>(spCaptureMesh->getVertexDataCloud());
+		auto& platform = *ctx.getPlatformControls();
+		auto& camera = *ctx.getCamera();
+
+		Eigen::Matrix4f transMat;
+		transMat <<
+			 0.24645f,  0.01465f,  0.01943f,  0.0f,
+			-0.02306f,  0.16352f,  0.16924f,  0.0f,
+			-0.00203f, -0.12225f,  0.11809f,  0.0f,
+			 0.01083f,  0.11231f, -0.67500f,  1.0f;
+
+		transMat.transposeInPlace();
+
+		auto spTestClip = std::make_shared<ClipVolume>(transMat);
+		Reconstructor recon(spTestClip);
 		
+		platform.startRotation();
+		while (platform.isRotating())
+		{
+			auto spDepthFrame = camera.captureFrame();
+			recon.submitFrame(spDepthFrame);
+		}
+
+		auto spCaptureMesh = recon.waitForResult();
+		if (spCaptureMesh->sizeVertices() == 0)
+		{
+			request.reply(status_codes::BadRequest);
+			return;
+		}
+
+		auto spCaptureCloud = boost::make_shared<PointCloud>(spCaptureMesh->getVertexDataCloud());
+		auto spIdealMesh = tryLoadBinaryStlFile("models/cylinder_with_low_spoke.stl");
 		vis::AlignmentQuality quality;
 		auto spIdealSurface = alignPointCloud(*spIdealMesh, spCaptureCloud, quality);
 		auto spErrorCloud = createErrorCloud(spIdealSurface, *spCaptureCloud);
 		ProgressVisualizer::get()->notifyErrorCloud(spErrorCloud);
-
 		respondWithCloud(request, *spErrorCloud);
 	}
 
 
 	void scanRoom(const web::http::http_request& request, const DeviceContext& ctx)
 	{
+		ProgressVisualizer::get()->notifyNewScan();
+
 		auto spRoomCloud = ctx.getCamera()->captureFrame()->generatePointCloud();
 		respondWithCloud(request, *spRoomCloud);
 	}

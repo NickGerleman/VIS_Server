@@ -12,9 +12,8 @@ vcpkg. The following packages are neccesary to install:
 - cpprestsdk
 - pcl
 
-It is additionally required that the Kinect SDK 1.8 and Kinect Toolkit 1.8 be seperately
-installed. These can be found at https://www.microsoft.com/en-us/download/details.aspx?id=40278
-and https://www.microsoft.com/en-us/download/details.aspx?id=40276.
+It is additionally required that the Kinect SDK V2 be seperately installed. This may be
+found at https://www.microsoft.com/en-us/download/details.aspx?id=44561.
 
 ### Command Line Arguments
 

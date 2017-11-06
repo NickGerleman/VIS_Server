@@ -3,14 +3,19 @@
 
 using namespace std::chrono;
 using namespace std::chrono_literals;
+using namespace pcl;
+using namespace visualization;
 
 namespace vis
 {
 	static const int NUM_ROWS = 2;
 	static const int NUM_COLS = 3;
 
-	static const milliseconds PUSH_INTERVAL = 10ms;
+	/// Used to determine how many points are sampled from a frame to generate a point cloud
+	static const int FRAME_SAMPLE_STEP = 2;
+	static const int POINT_SIZE = 2;
 
+	/// Tags used to idemtify each point cloud
 	static const char* DEPTH_FRAME_TAG     = "DEPTH_FRAME_TAG";
 	static const char* CLIP_FRAME_TAG      = "CLIP_FRAME_TAG";
 	static const char* RECONSTRUCTION_TAG  = "RECONSTRUCTION_TAG";
@@ -18,36 +23,13 @@ namespace vis
 	static const char* ALIGNMENT_TAG       = "ALIGNMENT_TAG";
 	static const char* ERROR_CLOUD_TAG     = "ERROR_CLOUD_TAG";
 
+	/// Text for each viewport
 	static const char* DEPTH_FRAME_TEXT    = "World Depth";
 	static const char* CLIP_FRAME_TEXT     = "Clipped Depth";
 	static const char* RECONSTRUCTION_TEXT = "3D Reconstruction";
-	static const char* SURFACE_CLOUD_TEXT  = "Surface Reconstruction";
+	static const char* SURFACE_CLOUD_TEXT  = "Surface Construction";
 	static const char* ALIGNMENT_TEXT      = "Alignment";
 	static const char* ERROR_CLOUD_TEXT    = "Error Levels";
-
-	ProgressRecord::ProgressRecord(
-		const std::shared_ptr<DepthFrame>& spDepthFrame,
-		const boost::shared_ptr<PointCloud>& spSurfaceCloud,
-		const std::shared_ptr<DepthFrame>& spClipFrame,
-		const boost::shared_ptr<PointCloud>& spAlignment,
-		const boost::shared_ptr<ErrorPointCloud>& spErrorCloud
-	)
-	{
-		if (spDepthFrame)
-			this->spDepthFrame = spDepthFrame->clone();
-
-		if (spSurfaceCloud)
-			this->spSurfaceCloud = boost::make_shared<PointCloud>(*spSurfaceCloud);
-
-		if (spClipFrame)
-			this->spClipFrame = spClipFrame->clone();
-
-		if (spAlignment)
-			this->spAlignment = boost::make_shared<PointCloud>(*spAlignment);
-
-		if (spErrorCloud)
-			this->spErrorCloud = boost::make_shared<ErrorPointCloud>(*spErrorCloud);
-	}
 
 
 	/*static*/ ProgressVisualizer* ProgressVisualizer::get()
@@ -66,77 +48,102 @@ namespace vis
 			return;
 		isInitialized = true;
 
-		m_visualizationThread = std::thread([this]()
+		std::thread([this]()
 		{
-			m_spVisualizer = std::make_unique<pcl::visualization::PCLVisualizer>();
+			m_spVisualizer = std::make_unique<::PCLVisualizer>();
 			initViewports();
 
-			m_spVisualizer->setWindowName("Vizualizer");
-			m_spVisualizer->setBackgroundColor(0.15, 0.15, 0.15);
+			m_spVisualizer->setWindowName("Visualizer");
+			m_spVisualizer->setBackgroundColor(0.1, 0.1, 0.1);
 			m_spVisualizer->setShowFPS(false);
 
 			while (true)
 			{
-				{
-					std::lock_guard<std::mutex> lock(m_lastUpdateLock);
-					updateDisplay();
-				}
-
+				updateDisplay();
 				m_spVisualizer->spinOnce();
-				std::this_thread::sleep_for(PUSH_INTERVAL / 2);
+				std::this_thread::sleep_for(1ms);
 			}
-		});
 
-		m_visualizationThread.detach();
+		}).detach();
 	}
 
 
 	void ProgressVisualizer::notifyNewScan()
 	{
-		m_spLastDepthFrame = nullptr;
-		m_spLastSurfaceCloud = nullptr;
-		m_spLastClipFrame = nullptr;
-		m_spLastAlignment = nullptr;
-		m_spLastErrorCloud = nullptr;
+		std::lock_guard<std::mutex> depthLock(m_depthFrameMutex);
+		std::lock_guard<std::mutex> surfaceLock(m_surfaceCloudMutex);
+		std::lock_guard<std::mutex> clipLock(m_clipFrameMutex);
+		std::lock_guard<std::mutex> alignLock(m_alignedCloudMutex);
+		std::lock_guard<std::mutex> errorLock(m_errorCloudMutex);
+		std::lock_guard<std::mutex> reconLock(m_reconFrameMutex);
+
+		m_spDepthFrame = nullptr;
+		m_spSurfaceCloud = nullptr;
+		m_spClipFrame = nullptr;
+		m_spAlignedCloud = nullptr;
+		m_spErrorCloud = nullptr;
+		m_spReconFrame = nullptr;
+
+		m_depthFrameDirty
+			= m_clipFrameDirty
+			= m_surfaceCloudDirty
+			= m_alignedCloudDirty
+			= m_errorCloudDirty
+			= m_reconFrameDirty
+			= true;
 	}
 
 
 	void ProgressVisualizer::notifyDepthFrame(const std::shared_ptr<DepthFrame>& spFrame)
 	{
-		m_spLastDepthFrame = spFrame;
-		pushIfNeeded();
+		std::lock_guard<std::mutex> depthLock(m_depthFrameMutex);
+		m_spDepthFrame = spFrame;
+		m_depthFrameDirty = true;
 	}
 
 
-	void ProgressVisualizer::notifySurfaceCloud(const boost::shared_ptr<PointCloud>& spCloud)
+	void ProgressVisualizer::notifySurfaceCloud(const boost::shared_ptr<const PointCloud>& spCloud)
 	{
-		m_spLastSurfaceCloud = spCloud;
-		pushIfNeeded();
+		std::lock_guard<std::mutex> surfaceLock(m_surfaceCloudMutex);
+		m_spSurfaceCloud = spCloud;
+		m_surfaceCloudDirty = true;
 	}
 
 
-	void ProgressVisualizer::notifyClipFrame(const std::shared_ptr<DepthFrame>& spFrame)
+	void ProgressVisualizer::notifyClipFrame(const std::shared_ptr<DepthFrame>& spFrame, const std::shared_ptr<ClipVolume>& spClip)
 	{
-		m_spLastClipFrame = spFrame;
-		pushIfNeeded();
+		std::lock_guard<std::mutex> clipLock(m_clipFrameMutex);
+		m_spClipFrame = spFrame;
+		m_spClipVolume = spClip;
+		m_clipFrameDirty = true;
 	}
 
 
-	void ProgressVisualizer::notifyAlignment(const boost::shared_ptr<PointCloud>& spCloud)
+	void ProgressVisualizer::notifyAlignment(const boost::shared_ptr<const PointCloud>& spCloud)
 	{
-		m_spLastAlignment = spCloud;
-		pushIfNeeded();
+		std::lock_guard<std::mutex> alignLock(m_alignedCloudMutex);
+		m_spAlignedCloud = spCloud;
+		m_alignedCloudDirty = true;
 	}
 
 
-	void ProgressVisualizer::notifyErrorCloud(const boost::shared_ptr<ErrorPointCloud>& spCloud)
+	void ProgressVisualizer::notifyErrorCloud(const boost::shared_ptr<const ErrorPointCloud>& spCloud)
 	{
-		m_spLastErrorCloud = spCloud;
-		pushIfNeeded();
+		std::lock_guard<std::mutex> errorLock(m_errorCloudMutex);
+		m_spErrorCloud = spCloud;
+		m_errorCloudDirty = true;
 	}
 
 
-	static void initViewport(pcl::visualization::PCLVisualizer& vizualizer, int row, int col, const char* tag, const char* text, int& viewportId)
+	void ProgressVisualizer::notifyReconstruction(FusionFramePtr spFrame)
+	{
+		std::lock_guard<std::mutex> reconLock(m_reconFrameMutex);
+		m_spReconFrame = std::move(spFrame);
+		m_reconFrameDirty = true;
+	}
+
+
+	static void initViewport(PCLVisualizer& visualizer, int row, int col, const char* tag, const char* text, int& viewportId)
 	{
 		double minX = col * (1.0 / NUM_COLS);
 		double maxX = minX + (1.0 / NUM_COLS);
@@ -144,10 +151,11 @@ namespace vis
 		double maxY = 1 - (row * 1.0 / NUM_ROWS);
 		double minY = maxY - (1.0 / NUM_ROWS);
 
-		vizualizer.createViewPort(minX, minY, maxX, maxY, viewportId);
-		vizualizer.addText(text, 0, 0, text, viewportId);
-		vizualizer.addPointCloud(boost::make_shared<ColorPointCloud>(), tag, viewportId);
-		vizualizer.createViewPortCamera(viewportId);
+		visualizer.createViewPort(minX, minY, maxX, maxY, viewportId);
+		visualizer.addText(text, 20, 20, text, viewportId);
+		visualizer.addPointCloud(boost::make_shared<ColorPointCloud>(), tag, viewportId);
+		visualizer.setPointCloudRenderingProperties(PCL_VISUALIZER_POINT_SIZE, POINT_SIZE, tag);
+		visualizer.createViewPortCamera(viewportId);
 	}
 
 
@@ -156,52 +164,56 @@ namespace vis
 		initViewport(*m_spVisualizer, 0, 0, DEPTH_FRAME_TAG,    DEPTH_FRAME_TEXT,    m_depthFrameViewport);
 		initViewport(*m_spVisualizer, 0, 1, CLIP_FRAME_TAG,     CLIP_FRAME_TEXT,     m_clipFrameViewport);
 		initViewport(*m_spVisualizer, 0, 2, RECONSTRUCTION_TAG, RECONSTRUCTION_TEXT, m_reconstructionViewport);
-		initViewport(*m_spVisualizer, 1, 0, SURFACE_CLOUD_TAG,  SURFACE_CLOUD_TEXT, m_surfaceCloudViewport);
-		initViewport(*m_spVisualizer, 1, 1, ALIGNMENT_TAG,      ALIGNMENT_TEXT,      m_alignmentViewport);
-		initViewport(*m_spVisualizer, 1, 2, ERROR_CLOUD_TAG,    ERROR_CLOUD_TEXT,    m_errorViewport);
-	}
-
-
-	void ProgressVisualizer::pushIfNeeded()
-	{
-		auto curTime = high_resolution_clock::now();
-		if (curTime - m_lastPushTime > PUSH_INTERVAL)
-		{
-			std::lock_guard<std::mutex> lock(m_lastUpdateLock);
-			m_vizThreadRecord = ProgressRecord
-			(
-				m_spLastDepthFrame,
-				m_spLastSurfaceCloud,
-				m_spLastClipFrame,
-				m_spLastAlignment,
-				m_spLastErrorCloud
-			);
-			m_lastPushTime = curTime;
-		}
-
+		initViewport(*m_spVisualizer, 1, 0, SURFACE_CLOUD_TAG,  SURFACE_CLOUD_TEXT,  m_surfaceCloudViewport);
+		initViewport(*m_spVisualizer, 1, 1, ALIGNMENT_TAG,      ALIGNMENT_TEXT,      m_alignedCloudViewport);
+		initViewport(*m_spVisualizer, 1, 2, ERROR_CLOUD_TAG,    ERROR_CLOUD_TEXT,    m_errorCloudViewport);
 	}
 
 
 	void ProgressVisualizer::updateDisplay()
 	{
-		updateText();
-		updateDepthFrameView();
-		updateClipFrameView();
-		updateSurfaceCloudView();
-		updateAlignmentView();
-		updateErrorView();
+		if (m_depthFrameDirty)
+			updateDepthFrameView();
+
+		if (m_clipFrameDirty)
+			updateClipFrameView();
+
+		if (m_surfaceCloudDirty)
+			updateSurfaceCloudView();
+
+		if (m_alignedCloudDirty)
+			updateAlignmentView();
+
+		if (m_errorCloudDirty)
+			updateErrorView();
+
+		if (m_reconFrameDirty)
+			updateReconView();
+
+		m_depthFrameDirty
+			= m_clipFrameDirty
+			= m_surfaceCloudDirty
+			= m_alignedCloudDirty
+			= m_errorCloudDirty
+			= m_reconFrameDirty
+			= false;
 	}
 
 
 	void ProgressVisualizer::updateDepthFrameView()
 	{
-		if (!m_vizThreadRecord.spDepthFrame)
+		std::lock_guard<std::mutex> depthLock(m_depthFrameMutex);
+		if (!m_spDepthFrame)
 		{
 			m_spVisualizer->updatePointCloud(boost::make_shared<ColorPointCloud>(), DEPTH_FRAME_TAG);
 			return;
 		}
 
-		auto spColorDepthCloud = colorDepthCloud(*m_vizThreadRecord.spDepthFrame->generatePointCloud());
+		auto spDepthCloud = m_spDepthFrame->generatePointCloud(FRAME_SAMPLE_STEP);
+		if (spDepthCloud->empty())
+			return;
+		auto spColorDepthCloud = colorDepthCloud(*spDepthCloud);
+		
 		m_spVisualizer->updatePointCloud(spColorDepthCloud, DEPTH_FRAME_TAG);
 		fitCameraToCloud(m_depthFrameViewport, *spColorDepthCloud);
 	}
@@ -209,13 +221,22 @@ namespace vis
 
 	void ProgressVisualizer::updateClipFrameView()
 	{
-		if (!m_vizThreadRecord.spClipFrame)
+		std::lock_guard<std::mutex> clipLock(m_clipFrameMutex);
+		if (!m_spClipFrame)
 		{
 			m_spVisualizer->updatePointCloud(boost::make_shared<ColorPointCloud>(), CLIP_FRAME_TAG);
 			return;
 		}
 
-		auto spColorDepthCloud = colorDepthCloud(*m_vizThreadRecord.spClipFrame->generatePointCloud());
+		auto spClipCloud = m_spClipFrame->generatePointCloud(FRAME_SAMPLE_STEP);
+		for (auto& pt : *spClipCloud)
+			pt = m_spClipVolume->relativeCoordinate(pt);
+
+		if (spClipCloud->empty())
+			return;
+
+		auto spColorDepthCloud = colorDepthCloud(*spClipCloud);
+		
 		m_spVisualizer->updatePointCloud(spColorDepthCloud, CLIP_FRAME_TAG);
 		fitCameraToCloud(m_clipFrameViewport, *spColorDepthCloud);
 	}
@@ -223,13 +244,14 @@ namespace vis
 
 	void ProgressVisualizer::updateSurfaceCloudView()
 	{
-		if (!m_vizThreadRecord.spSurfaceCloud)
+		std::lock_guard<std::mutex> surfaceLock(m_surfaceCloudMutex);
+		if (!m_spSurfaceCloud)
 		{
 			m_spVisualizer->updatePointCloud(boost::make_shared<ColorPointCloud>(), SURFACE_CLOUD_TAG);
 			return;
 		}
 
-		auto spColorDepthCloud = colorDepthCloud(*m_vizThreadRecord.spSurfaceCloud);
+		auto spColorDepthCloud = colorDepthCloud(*m_spSurfaceCloud);
 		m_spVisualizer->updatePointCloud(spColorDepthCloud, SURFACE_CLOUD_TAG);
 		fitCameraToCloud(m_surfaceCloudViewport, *spColorDepthCloud);
 	}
@@ -237,29 +259,31 @@ namespace vis
 
 	void ProgressVisualizer::updateAlignmentView()
 	{
-		if (!m_vizThreadRecord.spAlignment)
+		std::lock_guard<std::mutex> alignLock(m_alignedCloudMutex);
+		if (!m_spAlignedCloud)
 		{
 			m_spVisualizer->updatePointCloud(boost::make_shared<ColorPointCloud>(), ALIGNMENT_TAG);
 			return;
 		}
 
-		auto spComposite = colorDepthCloud(*m_vizThreadRecord.spSurfaceCloud);
-		auto spCapture = colorDepthCloud(*m_vizThreadRecord.spAlignment, {0.8f, 0.2f, 0.2f}, {0.2f, 0.2f, 0.2f});
+		auto spComposite = colorDepthCloud(*m_spSurfaceCloud);
+		auto spCapture = colorDepthCloud(*m_spAlignedCloud, {0.8f, 0.2f, 0.2f}, {0.2f, 0.2f, 0.2f});
 		spComposite->insert(spComposite->end(), spCapture->begin(), spCapture->end());
 
 		m_spVisualizer->updatePointCloud(spComposite, ALIGNMENT_TAG);
-		fitCameraToCloud(m_alignmentViewport, *spComposite);
+		fitCameraToCloud(m_alignedCloudViewport, *spComposite);
 	}
 
 
 	void ProgressVisualizer::updateErrorView()
 	{
-		if (!m_vizThreadRecord.spErrorCloud)
+		std::lock_guard<std::mutex> errorLock(m_errorCloudMutex);
+		if (!m_spErrorCloud)
 		{
 			m_spVisualizer->updatePointCloud(boost::make_shared<ColorPointCloud>(), ERROR_CLOUD_TAG);
 			return;
 		}
-		const auto& spErrorCloud = m_vizThreadRecord.spErrorCloud;
+		const auto& spErrorCloud = m_spErrorCloud;
 
 		auto compareError = [](auto& p1, auto& p2)
 		{
@@ -276,55 +300,67 @@ namespace vis
 		auto spColorCloud = boost::make_shared<ColorPointCloud>();
 		for (const auto& pt : *spErrorCloud)
 		{
-			pcl::PointXYZ xyzPoint(pt.x, pt.y, pt.z);
-			spColorCloud->push_back(colorPoint({ 0.8f, 0.8f, 0.8f }, { 0.8f, 0.0f, 0.0f }, gradientMin, gradientMax, xyzPoint, pt.intensity));
+			PointXYZ xyzPoint(pt.x, pt.y, pt.z);
+			spColorCloud->push_back(colorPoint({0.8f, 0.8f, 0.8f}, { 0.8f, 0.0f, 0.0f }, gradientMin, gradientMax, xyzPoint, pt.intensity));
 		}
 		m_spVisualizer->updatePointCloud(spColorCloud, ERROR_CLOUD_TAG);
-		fitCameraToCloud(m_errorViewport, *spColorCloud);
+		fitCameraToCloud(m_errorCloudViewport, *spColorCloud);
 	}
 
 
-	void ProgressVisualizer::updateText()
+	void ProgressVisualizer::updateReconView()
 	{
-		const double PADDING_X = 0.06;
-		const double PADDING_Y = 0.04;
+		std::lock_guard<std::mutex> reconLock(m_reconFrameMutex);
+		if (!m_spReconFrame)
+		{
+			m_spVisualizer->updatePointCloud(boost::make_shared<ColorPointCloud>(), RECONSTRUCTION_TAG);
+			return;
+		}
 
-		std::vector<pcl::visualization::Camera> viewportCameras;
-		m_spVisualizer->getCameras(viewportCameras);
-		double viewportWidth = viewportCameras[0].window_size[0] / NUM_COLS;
-		double viewportHeight = viewportCameras[0].window_size[0] / NUM_ROWS;
+		// Treat the frame like a point cloud along one plane
+		auto spCloud = boost::make_shared<ColorPointCloud>();
+		uint32_t* pPixelsArgb = reinterpret_cast<uint32_t*>(m_spReconFrame->pFrameBuffer->pBits);
+		uint32_t pxStride = m_spReconFrame->pFrameBuffer->Pitch / sizeof(uint32_t);
 
-		int offsetX = static_cast<int>(PADDING_X * viewportWidth);
-		int offsetY = static_cast<int>(PADDING_Y * viewportHeight);
+		for (UINT y = 0; y < m_spReconFrame->height; y++)
+		{
+			for (UINT x = 0; x < m_spReconFrame->width; x++)
+			{
+				uint32_t pixel = pPixelsArgb[(y * pxStride) + x];
+				uint8_t a = static_cast<uint8_t>(pixel >> 24);
+				uint8_t r = static_cast<uint8_t>(pixel >> 16);
+				uint8_t g = static_cast<uint8_t>(pixel >> 8);
+				uint8_t b = static_cast<uint8_t>(pixel);
 
-		m_spVisualizer->updateText(SURFACE_CLOUD_TEXT,  offsetX, offsetY, SURFACE_CLOUD_TEXT);
-		m_spVisualizer->updateText(DEPTH_FRAME_TEXT,    offsetX, offsetY, DEPTH_FRAME_TEXT);
-		m_spVisualizer->updateText(CLIP_FRAME_TEXT,     offsetX, offsetY, CLIP_FRAME_TEXT);
-		m_spVisualizer->updateText(RECONSTRUCTION_TEXT, offsetX, offsetY, RECONSTRUCTION_TEXT);
-		m_spVisualizer->updateText(ALIGNMENT_TEXT,      offsetX, offsetY, ALIGNMENT_TEXT);
-		m_spVisualizer->updateText(ERROR_CLOUD_TEXT,    offsetX, offsetY, ERROR_CLOUD_TEXT);
+				PointXYZRGB pt(r, g, b);
+				pt.x = static_cast<float>(x);
+				pt.y = -static_cast<float>(y);
+				pt.z = -100.0f;
+				spCloud->push_back(pt);
+			}
+
+		}
+
+		m_spVisualizer->updatePointCloud(spCloud, RECONSTRUCTION_TAG);
+		fitCameraToCloud(m_reconstructionViewport, *spCloud);
 	}
 
 
 	template <typename TCloud>
 	void ProgressVisualizer::fitCameraToCloud(int viewport, const TCloud& cloud)
 	{
-		std::vector<pcl::visualization::Camera> viewportCameras;
+		std::vector<Camera> viewportCameras;
 		m_spVisualizer->getCameras(viewportCameras);
 		auto& ourCamera = viewportCameras[viewport];
 		
-		// Set up-vector and look-vector
+		// Set up-vector
 		ourCamera.view[0] = 0.0;
 		ourCamera.view[1] = 1.0;
 		ourCamera.view[2] = 0.0;
 
-		ourCamera.focal[0] = 0.0;
-		ourCamera.focal[1] = 0.0;
-		ourCamera.focal[2] = -1.0;
-
 		// Find bounds of current point cloud
-		float minX, maxX, minY, maxY, maxZ;
-		minX = minY = FLT_MAX;
+		float minX, maxX, minY, maxY, minZ, maxZ;
+		minX = minY = minZ = FLT_MAX;
 		maxX = maxY = maxZ = FLT_MIN;
 		for (auto& pt : cloud)
 		{
@@ -332,6 +368,7 @@ namespace vis
 			maxX = std::fmax(maxX, pt.x);
 			minY = std::fmin(minY, pt.y);
 			maxY = std::fmax(maxY, pt.y);
+			minZ = std::fmax(maxZ, pt.z);
 			maxZ = std::fmax(maxZ, pt.z);
 		}
 		
@@ -341,17 +378,25 @@ namespace vis
 		ourCamera.pos[0] = minX + (dX / 2);
 		ourCamera.pos[1] = minY + (dY / 2);
 
+		ourCamera.focal[0] = ourCamera.pos[0];
+		ourCamera.focal[1] = ourCamera.pos[1];
+		ourCamera.focal[2] = maxZ;
+
 		// Use FOV to calculate Z pos (with padding)
-		const double PADDING_FACTOR = 1.3;
+		const double PADDING_FACTOR = 1.2;
 		auto aspectRatio = ((ourCamera.window_size[0] / NUM_COLS) / (ourCamera.window_size[1] / NUM_ROWS));
-		auto fovX = 2.0 * atan(tan(ourCamera.fovy / aspectRatio));
+		auto fovX = 2.0 * atan(tan(ourCamera.fovy / 2.0) * aspectRatio);
 		
 		auto thetaX = fovX / 2;
 		auto zFitX = (1 / tan(thetaX)) * (dX * PADDING_FACTOR / 2);
 		auto thetaY = ourCamera.fovy / 2;
 		auto zFitY = (1 / tan(thetaY)) * (dY * PADDING_FACTOR / 2);
 
-		ourCamera.pos[2] = maxZ + (std::fmax(zFitX, zFitY));
+		ourCamera.pos[2] = maxZ + std::fmax(zFitX, zFitY);
+
+		// Choose some reasonable clip planes based on Z pos
+		ourCamera.clip[0] = ourCamera.pos[2];
+		ourCamera.clip[1] = minZ;
 
 		// Finally set
 		m_spVisualizer->setCameraParameters(ourCamera, viewport);
@@ -376,7 +421,7 @@ namespace vis
 	}
 
 
-	static pcl::PointXYZRGB colorPoint(const Eigen::Vector3f& minColor, const Eigen::Vector3f& maxColor, float minValue, float maxValue, pcl::PointXYZ point, float pointValue)
+	static PointXYZRGB colorPoint(const Eigen::Vector3f& minColor, const Eigen::Vector3f& maxColor, float minValue, float maxValue, PointXYZ point, float pointValue)
 	{
 		auto scale = maxValue - minValue;
 		auto normalizedVal = scale == 0 ? 0 : (pointValue - minValue) / scale;
@@ -386,7 +431,7 @@ namespace vis
 		auto gDiff = maxColor[1] - minColor[1];
 		auto bDiff = maxColor[2] - minColor[2];
 
-		pcl::PointXYZRGB retPoint
+		PointXYZRGB retPoint
 		(
 			static_cast<uint8_t>((minColor[0] + rDiff * normalizedVal) * 255),
 			static_cast<uint8_t>((minColor[1] + gDiff * normalizedVal) * 255),
