@@ -47,7 +47,7 @@ namespace vis
 	class ServoPlatformControls : public IPlatformControls
 	{
 	public:
-		ServoPlatformControls(Serial* pserialPort) 
+		ServoPlatformControls(Serial* pserialPort)
 			: m_pserialPort(pserialPort) {}
 
 		void startRotation() override;

@@ -18,13 +18,16 @@ namespace vis
 	{
 		if (m_pserialPort->isConnected())
 		{
-			m_pserialPort->writeData("r", 1);
+			if (!m_pserialPort->writeData("r", 1))
+			{
+				throw std::runtime_error("Failed to send rotation command through Serial Port");
+			}
 		}
 	}
 
 	bool ServoPlatformControls::isRotating()
 	{
-		if (m_pserialPort->isConnected()) 
+		if (m_pserialPort->isConnected())
 		{
 			char incomingData[256] = "";
 			m_pserialPort->readData(incomingData, 255);

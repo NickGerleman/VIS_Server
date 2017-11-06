@@ -4,34 +4,37 @@ namespace vis
 
 	class Serial
 	{
-	private:
-		//Serial comm handler
-		HANDLE hSerial;
-		//Connection status
-		bool connected;
-		//Get various information about the connection
-		COMSTAT status;
-		//Keep track of last error
-		DWORD errors;
-
 	public:
-		const int ARDUINO_WAIT_TIME = 2'000;
 
-		//Initialize Serial communication with the given COM port
+		/// Initialize Serial communication with the given port name
+		/// @param name of the Serial communication port
 		Serial(const char *portName);
-		//Close the connection
+
+		/// Close the connection
 		~Serial();
-		//Read data in a buffer, if nbChar is greater than the
-		//maximum number of bytes available, it will return only the
-		//bytes available. The function return -1 when nothing could
-		//be read, the number of bytes actually read.
+
+		/// Read data in a buffer
+		/// @param buffer block of memory to write incoming data
+		/// @param nbChar number of bytes to read
 		int readData(char *buffer, unsigned int nbChar);
-		//Writes data from a buffer through the Serial connection
-		//return true on success.
+
+		/// Writes data from a buffer through the Serial connection
+		/// @param buffer block of memory to send outgoing data
+		/// @param nbChar number of bytes to write
 		bool writeData(const char *buffer, unsigned int nbChar);
-		//Check if we are actually connected
+
+		/// Check if we are actually connected
 		bool isConnected();
 
+	private:
+		/// Serial comm handler
+		HANDLE m_serialHandler;
+		/// Connection status
+		bool m_connected;
+		/// Get various information about the connection
+		COMSTAT m_status;
+		/// Keep track of last error
+		DWORD m_errors;
 
 	};
 

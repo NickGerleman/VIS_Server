@@ -6,11 +6,19 @@ namespace vis
 
 	Serial::Serial(const char *portName)
 	{
-		//We're not yet connected
-		this->connected = false;
+		// We're not yet connected
+		this->m_connected = false;
 
-		//Try to connect to the given port throuh CreateFile
-		this->hSerial = CreateFileA(portName,
+		try 
+		{
+
+		}
+		catch (std::exception &e)
+		{
+
+		}
+		// Try to connect to the given port throuh CreateFile
+		this->m_serialHandler = CreateFileA(portName,
 			GENERIC_READ | GENERIC_WRITE,
 			0,
 			NULL,
@@ -18,15 +26,13 @@ namespace vis
 			FILE_ATTRIBUTE_NORMAL,
 			NULL);
 
-		//Check if the connection was successfull
-		if (this->hSerial == INVALID_HANDLE_VALUE)
+		// Check if the connection was successfull
+		if (this->m_serialHandler == INVALID_HANDLE_VALUE)
 		{
-			//If not success full display an Error
-			DWORD lol = GetLastError();
+			// If not success full display an Error
 			if (GetLastError() == ERROR_FILE_NOT_FOUND) {
 
-				//Print Error if neccessary
-				printf("ERROR: Handle was not attached. Reason: %s not available.\n", portName);
+				throw std::runtime_error("ERROR: Handle was not attached. Reason: " + std::string(portName) + " not available.\n" );
 
 			}
 			else
@@ -36,39 +42,37 @@ namespace vis
 		}
 		else
 		{
-			//If connected we try to set the comm parameters
+			// If connected we try to set the comm parameters
 			DCB dcbSerialParams = { 0 };
 
-			//Try to get the current
-			if (!GetCommState(this->hSerial, &dcbSerialParams))
+			// Try to get the current
+			if (!GetCommState(this->m_serialHandler, &dcbSerialParams))
 			{
-				//If impossible, show an error
+				// If impossible, show an error
 				printf("failed to get current serial parameters!");
 			}
 			else
 			{
-				//Define serial connection parameters for the arduino board
+				// Define serial connection parameters for the arduino board
 				dcbSerialParams.BaudRate = CBR_9600;
 				dcbSerialParams.ByteSize = 8;
 				dcbSerialParams.StopBits = ONESTOPBIT;
 				dcbSerialParams.Parity = NOPARITY;
-				//Setting the DTR to Control_Enable ensures that the Arduino is properly
-				//reset upon establishing a connection
+				// Setting the DTR to Control_Enable ensures that the Arduino is properly
+				// reset upon establishing a connection
 				dcbSerialParams.fDtrControl = DTR_CONTROL_ENABLE;
 
-				//Set the parameters and check for their proper application
-				if (!SetCommState(hSerial, &dcbSerialParams))
+				// Set the parameters and check for their proper application
+				if (!SetCommState(m_serialHandler, &dcbSerialParams))
 				{
-					printf("ALERT: Could not set Serial Port parameters");
+					throw std::runtime_error("ALERT: Could not set Serial Port parameters");
 				}
 				else
 				{
-					//If everything went fine we're connected
-					this->connected = true;
-					//Flush any remaining characters in the buffers 
-					PurgeComm(this->hSerial, PURGE_RXCLEAR | PURGE_TXCLEAR);
-					//We wait 2s as the arduino board will be reseting
-					Sleep(ARDUINO_WAIT_TIME);
+					// If everything went fine we're connected
+					this->m_connected = true;
+					// Flush any remaining characters in the buffers 
+					PurgeComm(this->m_serialHandler, PURGE_RXCLEAR | PURGE_TXCLEAR);
 				}
 			}
 		}
@@ -77,50 +81,50 @@ namespace vis
 
 	Serial::~Serial()
 	{
-		//Check if we are connected before trying to disconnect
-		if (this->connected)
+		// Check if we are connected before trying to disconnect
+		if (this->m_connected)
 		{
-			//We're no longer connected
-			this->connected = false;
-			//Close the serial handler
-			CloseHandle(this->hSerial);
+			// We're no longer connected
+			this->m_connected = false;
+			// Close the serial handler
+			CloseHandle(this->m_serialHandler);
 		}
 	}
 
 	int Serial::readData(char *buffer, unsigned int nbChar)
 	{
-		//Number of bytes we'll have read
+		// Number of bytes we'll have read
 		DWORD bytesRead;
-		//Number of bytes we'll really ask to read
+		// Number of bytes we'll really ask to read
 		unsigned int toRead;
 
-		//Use the ClearCommError function to get status info on the Serial port
-		ClearCommError((this->hSerial), &(this->errors), &(this->status));
+		// Use the ClearCommError function to get status info on the Serial port
+		ClearCommError((this->m_serialHandler), &(this->m_errors), &(this->m_status));
 
-		//Check if there is something to read
-		if (this->status.cbInQue > 0)
+		// Check if there is something to read
+		if (this->m_status.cbInQue > 0)
 		{
-			//If there is we check if there is enough data to read the required number
-			//of characters, if not we'll read only the available characters to prevent
-			//locking of the application.
-			if (this->status.cbInQue > nbChar)
+			// If there is we check if there is enough data to read the required number
+			// of characters, if not we'll read only the available characters to prevent
+			// locking of the application.
+			if (this->m_status.cbInQue > nbChar)
 			{
 				toRead = nbChar;
 			}
 			else
 			{
-				toRead = this->status.cbInQue;
+				toRead = this->m_status.cbInQue;
 			}
 
-			//Try to read the require number of chars, and return the number of read bytes on success
-			if (ReadFile(this->hSerial, buffer, toRead, &bytesRead, NULL))
+			// Try to read the require number of chars, and return the number of read bytes on success
+			if (ReadFile(this->m_serialHandler, buffer, toRead, &bytesRead, NULL))
 			{
 				return bytesRead;
 			}
 
 		}
 
-		//If nothing has been read, or that an error was detected return 0
+		// If nothing has been read, or that an error was detected return 0
 		return 0;
 
 	}
@@ -130,11 +134,11 @@ namespace vis
 	{
 		DWORD bytesSend;
 
-		//Try to write the buffer on the Serial port
-		if (!WriteFile(this->hSerial, (void *)buffer, nbChar, &bytesSend, 0))
+		// Try to write the buffer on the Serial port
+		if (!WriteFile(this->m_serialHandler, (void *)buffer, nbChar, &bytesSend, 0))
 		{
-			//In case it don't work get comm error and return false
-			ClearCommError(this->hSerial, &this->errors, &this->status);
+			// In case it don't work get comm error and return false
+			ClearCommError(this->m_serialHandler, &this->m_errors, &this->m_status);
 
 			return false;
 		}
@@ -144,8 +148,8 @@ namespace vis
 
 	bool Serial::isConnected()
 	{
-		//Simply return the connection status
-		return this->connected;
+		// Simply return the connection status
+		return this->m_connected;
 	}
 
 }
