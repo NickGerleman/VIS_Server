@@ -55,13 +55,16 @@ namespace vis
 
 
 	template <typename TCloud>
-	static void respondWithCloudT(const web::http::http_request& request, const TCloud& cloud)
+	static web::http::http_response createPointCloudResponseT(const web::http::http_request& request, const TCloud& cloud)
 	{
+		http_response res;
+		res.set_status_code(status_codes::OK);
+
 		auto queryParams = uri::split_query(request.request_uri().query());
 		if (queryParams.find(L"spc") != queryParams.end() && queryParams[L"spc"] == L"true")
 		{
 			auto spcBytes = convertCloudToSpc(cloud);
-			request.reply(status_codes::OK, Concurrency::streams::bytestream::open_istream(spcBytes));
+			res.set_body(Concurrency::streams::bytestream::open_istream(spcBytes));
 		}
 		else
 		{
@@ -71,20 +74,22 @@ namespace vis
 			for (size_t i = 0; i < cloud.size(); i++)
 				pointCloudArray[i] = jsonPoint(cloud[i]);
 
-			request.reply(status_codes::OK, resObj);
+			res.set_body(resObj);
 		}
+
+		return res;
 	}
 
 
-	void respondWithCloud(const web::http::http_request& req, const PointCloud& cloud)
+	web::http::http_response createPointCloudResponse(const web::http::http_request& req, const PointCloud& cloud)
 	{
-		respondWithCloudT(req, cloud);
+		return createPointCloudResponseT(req, cloud);
 	}
 
 
-	void respondWithCloud(const web::http::http_request& req, const ErrorPointCloud& cloud)
+	web::http::http_response createPointCloudResponse(const web::http::http_request& req, const ErrorPointCloud& cloud)
 	{
-		respondWithCloudT(req, cloud);
+		return createPointCloudResponseT(req, cloud);
 	}
 
 
@@ -94,9 +99,9 @@ namespace vis
 	}
 
 
-	void HttpRoute::handle(const http_request& request, const DeviceContext& ctx)
+	web::http::http_response HttpRoute::handle(const http_request& request, const DeviceContext& ctx)
 	{
-		m_handler(request, ctx);
+		return m_handler(request, ctx);
 	}
 
 
@@ -108,7 +113,11 @@ namespace vis
 			{
 				try
 				{
-					route.handle(request, *m_pAppContext);
+					auto response = route.handle(request, *m_pAppContext);
+					
+					// Enable CORS in case we're running the Frontend on a seperate port
+					response.headers()[L"Access-Control-Allow-Origin"] = L"*";
+					request.reply(response);
 				}
 				catch (std::runtime_error& ex)
 				{

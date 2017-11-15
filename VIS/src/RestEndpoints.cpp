@@ -25,8 +25,9 @@ namespace vis
 	};
 
 
-	void scanObject(const web::http::http_request& request, const DeviceContext& ctx)
+	http_response scanObject(const web::http::http_request& request, const DeviceContext& ctx)
 	{
+		http_response res;
 		ProgressVisualizer::get()->notifyNewScan();
 
 		// Platform rotation is not thread-safe
@@ -58,8 +59,8 @@ namespace vis
 		auto spCaptureMesh = recon.waitForResult();
 		if (spCaptureMesh->sizeVertices() == 0)
 		{
-			request.reply(status_codes::BadRequest);
-			return;
+			res.set_status_code(status_codes::BadRequest);
+			return res;
 		}
 
 		auto spCaptureCloud = boost::make_shared<PointCloud>(spCaptureMesh->getVertexDataCloud());
@@ -68,26 +69,29 @@ namespace vis
 		auto spIdealSurface = alignPointCloud(*spIdealMesh, spCaptureCloud, quality);
 		auto spErrorCloud = createErrorCloud(spIdealSurface, *spCaptureCloud);
 		ProgressVisualizer::get()->notifyErrorCloud(spErrorCloud);
-		respondWithCloud(request, *spErrorCloud);
+		
+		return createPointCloudResponse(request, *spErrorCloud);
 	}
 
 
-	void scanRoom(const web::http::http_request& request, const DeviceContext& ctx)
+	http_response scanRoom(const web::http::http_request& request, const DeviceContext& ctx)
 	{
 		ProgressVisualizer::get()->notifyNewScan();
 
 		auto spRoomCloud = ctx.getCamera()->captureFrame()->generatePointCloud();
-		respondWithCloud(request, *spRoomCloud);
+		return createPointCloudResponse(request, *spRoomCloud);
 	}
 
 
-	void listMeshFiles(const http_request& request, const DeviceContext& ctx)
+	http_response listMeshFiles(const http_request& request, const DeviceContext& ctx)
 	{
+		http_response res;
 		auto modelPath = vis::ensureModelPath();
+
 		if (!modelPath)
 		{
-			request.reply(status_codes::InternalError);
-			return;
+			res.set_status_code(status_codes::InternalError);
+			return res;
 		}
 
 		auto resObj = json::value::object();
@@ -109,25 +113,29 @@ namespace vis
 			i++;
 		}
 
-		request.reply(status_codes::OK, resObj);
+		res.set_status_code(status_codes::OK);
+		res.set_body(resObj);
+		return res;
 	}
 
 
-	void downloadMeshFile(const web::http::http_request& request, const DeviceContext& ctx)
+	http_response downloadMeshFile(const web::http::http_request& request, const DeviceContext& ctx)
 	{
+		http_response res;
+
 		auto queryParams = uri::split_query(request.request_uri().query());
 		if (queryParams.find(L"path") == queryParams.end())
 		{
-			request.reply(status_codes::BadRequest);
-			return;
+			res.set_status_code(status_codes::BadRequest);
+			return res;
 		}
 
 		auto decodedPath = uri::decode(queryParams[L"path"]);
 		auto modelPath = ensureModelPath();
 		if (!modelPath)
 		{
-			request.reply(status_codes::InternalError);
-			return;
+			res.set_status_code(status_codes::InternalError);
+			return res;
 		}
 
 		// Prevent FS traversal exploits
@@ -136,19 +144,22 @@ namespace vis
 		{
 			if (path.filename_is_dot_dot())
 			{
-				request.reply(status_codes::Forbidden);
-				return;
+				res.set_status_code(status_codes::Forbidden);
+				return res;
 			}
 		}
 		
 		if (fs::exists(absolutePath) && fs::is_regular_file(absolutePath))
 		{
 			auto fstream = concurrency::streams::fstream::open_istream(absolutePath.generic_wstring()).get();
-			request.reply(status_codes::OK, fstream);
+			res.set_status_code(status_codes::OK);
+			res.set_body(fstream);
+			return res;
 		}
 		else
 		{
-			request.reply(status_codes::NotFound);
+			res.set_status_code(status_codes::NotFound);
+			return res;
 		}
 	}
 

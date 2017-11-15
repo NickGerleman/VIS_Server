@@ -14,16 +14,16 @@ namespace vis
 	boost::optional<boost::filesystem::path> ensureModelPath();
 
 
-	/// Respond to an HTTP request with a given point cloud
-	/// @param res the HTTP response
+	/// Generate an HTTP Response with a given point cloud
+	/// @param req the HTTP request
 	/// @param cloud the cloud to write
-	void respondWithCloud(const web::http::http_request& req, const PointCloud& cloud);
+	web::http::http_response createPointCloudResponse(const web::http::http_request& req, const PointCloud& cloud);
 
 
 	/// Respond to an HTTP request with a given point cloud
-	/// @param res the HTTP response
+	/// @param req the HTTP request
 	/// @param cloud the cloud to write
-	void respondWithCloud(const web::http::http_request& req, const ErrorPointCloud& cloud);
+	web::http::http_response createPointCloudResponse(const web::http::http_request& req, const ErrorPointCloud& cloud);
 
 
 	/// Context to app-wide resources
@@ -58,7 +58,7 @@ namespace vis
 	class HttpRoute
 	{
 	public:
-		using Handler = std::function<void(const web::http::http_request&, const DeviceContext&)>;
+		using Handler = std::function<web::http::http_response(const web::http::http_request&, const DeviceContext&)>;
 
 
 		/// Create a route binding the path and action
@@ -79,7 +79,7 @@ namespace vis
 
 		/// Call the bound action
 		/// @param request the associated request
-		void handle(const web::http::http_request& request, const DeviceContext& ctx);
+		web::http::http_response handle(const web::http::http_request& request, const DeviceContext& ctx);
 
 
 	private:
