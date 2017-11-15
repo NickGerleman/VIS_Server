@@ -204,6 +204,7 @@
     <None Include="captures\dildert_occipital_lowres.stl" />
     <None Include="models\cube.stl" />
     <None Include="models\cube_missing_corner.stl" />
+    <None Include="models\cylinder_with_low_spoke.stl" />
     <None Include="models\cylinder_with_spokes.stl" />
     <None Include="models\cylinder_with_spokes_facing_down.stl" />
     <None Include="models\cylinder_with_three_spokes.stl" />

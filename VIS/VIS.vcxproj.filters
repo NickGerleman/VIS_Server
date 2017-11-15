@@ -63,6 +63,7 @@
     <None Include="res\bin\KinectFusion180_64.dll" />
     <None Include="res\bin\OpenNI2\Drivers\PS1080.ini" />
     <None Include="res\bin\OpenNI2\Drivers\PS1080.dll" />
+    <None Include="models\cylinder_with_low_spoke.stl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lib\TinyObjLoader.h">
