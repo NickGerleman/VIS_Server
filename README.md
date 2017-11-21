@@ -50,11 +50,11 @@ Error handling or interruption is not currently implemented.
 
 **Return Codes**
 
-| Status | Description                             |
-|--------|-----------------------------------------|
-| 200    | Scan was successful                     |
-| 400    | The calibration volume has not been set |
-| 404    | The mesh was not found                  |
+| Status | Description                                              |
+|--------|----------------------------------------------------------|
+| 200    | Scan was successful                                      |
+| 400    | Missing parameter or calibration volume has not been set |
+| 404    | The mesh was not found                                   |
 
 **Sample Response**
 ```json

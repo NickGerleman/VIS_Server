@@ -32,6 +32,29 @@ namespace vis
 		http_response res;
 		ProgressVisualizer::get()->notifyNewScan();
 
+		auto queryParams = uri::split_query(request.request_uri().query());
+		if (!queryParams.count(L"mesh-path"))
+		{
+			res.set_status_code(status_codes::BadRequest);
+			return res;
+		}
+
+		auto maybeModelPath = absoluteModelPath(queryParams[L"mesh-path"]);
+		if (maybeModelPath.type() == typeid(FsError))
+		{
+			switch (boost::get<FsError>(maybeModelPath))
+			{
+			case FsError::ILLEGAL_PATH:
+				res.set_status_code(status_codes::Unauthorized);
+				break;
+			case FsError::NOT_FOUND:
+				res.set_status_code(status_codes::NotFound);
+				break;
+			}
+			return res;
+		}
+		auto spIdealMesh = tryLoadBinaryStlFile(boost::get<fs::path>(maybeModelPath).string());
+
 		// Platform rotation is not thread-safe
 		static std::mutex scanMutex;
 		std::lock_guard<std::mutex> scanLock(scanMutex);
@@ -70,7 +93,6 @@ namespace vis
 		}
 
 		auto spCaptureCloud = boost::make_shared<PointCloud>(spCaptureMesh->getVertexDataCloud());
-		auto spIdealMesh = tryLoadBinaryStlFile("models/cylinder_with_low_spoke.stl");
 		vis::AlignmentQuality quality;
 		auto spIdealSurface = alignPointCloud(*spIdealMesh, spCaptureCloud, quality);
 		auto spErrorCloud = createErrorCloud(spIdealSurface, *spCaptureCloud);
