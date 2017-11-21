@@ -17,11 +17,12 @@ found at https://www.microsoft.com/en-us/download/details.aspx?id=44561.
 
 ### Command Line Arguments
 
-| Switch       | Description                                             |
-|--------------|---------------------------------------------------------|
-| --oni        | Path to a .ONI file to use instead of a physical camera |
-| --port       | The port to listen on                                   |
-| --visualizer | Display a visualizer while doing scans                  |
+| Switch       | Description                                                                |
+|--------------|----------------------------------------------------------------------------|
+| --com        | The COM port number to use for platform rotation, unneeded if using a file |
+| --oni        | Path to a .ONI file to use instead of a physical camera                    |
+| --port       | The port to listen on                                                      |
+| --visualizer | Display a visualizer while doing scans                                     |
 
 ### SPC Binary Point Clouds
 It is possible to receive any point cloud as a custom binary format called SPC. This is a
@@ -49,11 +50,11 @@ Error handling or interruption is not currently implemented.
 
 **Return Codes**
 
-| Status | Description                  |
-|--------|------------------------------|
-| 200    | Scan was successful          |
-| 400    | 3D reconstruction has failed |
-| 404    | The mesh was not found       |
+| Status | Description                             |
+|--------|-----------------------------------------|
+| 200    | Scan was successful                     |
+| 400    | The calibration volume has not been set |
+| 404    | The mesh was not found                  |
 
 **Sample Response**
 ```json
@@ -122,3 +123,28 @@ these currently correspond directly to the files on the filesystem.
 	]
 }
 ```
+
+#### POST /calibration-volume
+Set the volume to look at during object scanning. This is represented as a 4x4 affine
+transformation matrix on a 1x1x1 cube placed at the origin. The matrix should be
+represented as a 16 element array composed of the matrix element in column-major order.
+
+**Sample Body**
+```json
+{
+	"transform": [
+		0.24645,  0.01465,  0.01943,  0,
+		-0.02306, 0.16352,  0.16924,  0,
+		-0.00203, -0.12225, 0.11809,  0,
+		0.01083,  0.11231,  -0.67500, 1
+	]
+}
+```
+
+**Return Codes**
+
+| Status | Description                            |
+|--------|----------------------------------------|
+| 200    | All Okay                               |
+| 400    | The uploaded body is invalid           |
+

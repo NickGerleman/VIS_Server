@@ -2,6 +2,7 @@
 #include "RestEndpoints.h"
 #include "Camera.h"
 #include "ErrorDetection.h"
+#include "FileStorage.h"
 #include "Geometry.h"
 #include "MeshIO.h"
 #include "Reconstruction.h"
@@ -18,10 +19,11 @@ namespace vis
 
 	std::vector<HttpRoute> AppServer::s_routes
 	{
-		HttpRoute(methods::GET,  L"/object-scan",    &scanObject),
-		HttpRoute(methods::GET,  L"/room-scan",      &scanRoom),
-		HttpRoute(methods::GET,  L"/mesh-file/all",  &listMeshFiles),
-		HttpRoute(methods::GET,  L"/mesh-file",      &downloadMeshFile)
+		HttpRoute(methods::GET,   L"/object-scan",         &scanObject),
+		HttpRoute(methods::GET,   L"/room-scan",           &scanRoom),
+		HttpRoute(methods::GET,   L"/mesh-file/all",       &listMeshFiles),
+		HttpRoute(methods::GET,   L"/mesh-file",           &downloadMeshFile),
+		HttpRoute(methods::POST,  L"/calibration-volume",  &setCalibrationVolume)
 	};
 
 
@@ -37,16 +39,20 @@ namespace vis
 		auto& platform = *ctx.getPlatformControls();
 		auto& camera = *ctx.getCamera();
 
-		Eigen::Matrix4f transMat;
-		transMat <<
-			 0.24645f,  0.01465f,  0.01943f,  0.0f,
-			-0.02306f,  0.16352f,  0.16924f,  0.0f,
-			-0.00203f, -0.12225f,  0.11809f,  0.0f,
-			 0.01083f,  0.11231f, -0.67500f,  1.0f;
+		auto maybeCalibrationMat = readCalibrationVolume();
+		if (maybeCalibrationMat.type() == typeid(FsError))
+		{
+			if (boost::get<FsError>(maybeCalibrationMat) == FsError::NOT_FOUND)
+			{
+				res.set_status_code(status_codes::BadRequest);
+				return res;
+			}
+			
+			throw std::runtime_error("Unexpected FS Error reading calibration matrix");
+		}
 
-		transMat.transposeInPlace();
-
-		auto spTestClip = std::make_shared<ClipVolume>(transMat);
+		auto spCalibrationMat = boost::get<std::shared_ptr<Eigen::Matrix4f>>(maybeCalibrationMat);
+		auto spTestClip = std::make_shared<ClipVolume>(*spCalibrationMat);
 		Reconstructor recon(spTestClip);
 		
 		platform.startRotation();
@@ -86,19 +92,19 @@ namespace vis
 	http_response listMeshFiles(const http_request& request, const DeviceContext& ctx)
 	{
 		http_response res;
-		auto modelPath = vis::ensureModelPath();
 
-		if (!modelPath)
+		auto modelPathResult = absoluteModelPath(fs::path());
+		if (modelPathResult.type() == typeid(FsError))
 		{
 			res.set_status_code(status_codes::InternalError);
 			return res;
 		}
+		auto modelPath = boost::get<fs::path>(modelPathResult);
 
 		auto resObj = json::value::object();
 		auto& filesArr = resObj[L"files"] = json::value::array();
 
-		fs::recursive_directory_iterator iter(*modelPath);
-		
+		fs::recursive_directory_iterator iter(modelPath);
 		size_t i = 0;
 		for (const auto& file : iter)
 		{
@@ -106,7 +112,7 @@ namespace vis
 				continue;
 
 			auto& fileObj = filesArr[i] = json::value::object();
-			auto& relativePath = fs::relative(file.path(), *modelPath);
+			auto& relativePath = fs::relative(file.path(), modelPath);
 
 			fileObj[L"path"] = json::value(relativePath.generic_wstring());
 			fileObj[L"filename"] = json::value(relativePath.filename().generic_wstring());
@@ -131,36 +137,57 @@ namespace vis
 		}
 
 		auto decodedPath = uri::decode(queryParams[L"path"]);
-		auto modelPath = ensureModelPath();
-		if (!modelPath)
+		auto absPath = absoluteModelPath(fs::path(decodedPath));
+		if (absPath.type() == typeid(FsError))
 		{
-			res.set_status_code(status_codes::InternalError);
-			return res;
-		}
-
-		// Prevent FS traversal exploits
-		auto absolutePath = modelPath.get().append(decodedPath);
-		for (auto& path : absolutePath)
-		{
-			if (path.filename_is_dot_dot())
+			switch (boost::get<FsError>(absPath))
 			{
+			case FsError::ILLEGAL_PATH:
 				res.set_status_code(status_codes::Forbidden);
+				return res;
+
+			case FsError::NOT_FOUND:
+				res.set_status_code(status_codes::NotFound);
 				return res;
 			}
 		}
 		
-		if (fs::exists(absolutePath) && fs::is_regular_file(absolutePath))
+		auto pathStr = boost::get<fs::path>(absPath).generic_wstring();
+		auto fstream = concurrency::streams::fstream::open_istream(pathStr).get();
+		res.set_body(fstream);
+
+		res.set_status_code(status_codes::OK);
+		return res;
+	}
+
+
+	web::http::http_response setCalibrationVolume(const web::http::http_request& request, const DeviceContext& ctx)
+	{
+		http_response res;
+
+		auto jsonBody = request.extract_json().get();
+		auto transformArr = jsonBody[L"transform"].as_array();
+		if (transformArr.size() != 16)
 		{
-			auto fstream = concurrency::streams::fstream::open_istream(absolutePath.generic_wstring()).get();
-			res.set_status_code(status_codes::OK);
-			res.set_body(fstream);
+			res.set_status_code(status_codes::BadRequest);
 			return res;
 		}
-		else
+
+		// The array is in column major format
+		Eigen::Matrix4f transformMat;
+		for (int i = 0; i < 16; i++)
 		{
-			res.set_status_code(status_codes::NotFound);
-			return res;
+			int row = i % 4;
+			int col = i / 4;
+			transformMat(row, col) = static_cast<float>(transformArr[i].as_double());
 		}
+
+		auto maybeError = writeCalibrationVolume(transformMat);
+		if (maybeError)
+			throw std::runtime_error("Failure writing calibration volume");
+
+		res.set_status_code(status_codes::OK);
+		return res;
 	}
 
 }

@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "FileStorage.h"
 #include "ServerCommon.h"
 #include "Visualization.h"
 
@@ -107,7 +108,7 @@ int main(int argc, char *argv[])
 		std::cerr << "Could not initialize OpenNI: " << openni::OpenNI::getExtendedError() << std::endl;
 		return EXIT_FAILURE;
 	}
-	ensureModelPath();
+	initFileStorage();
 
 	auto args = checkArgs(argc, argv);
 	auto ctx = createCtx(args);
@@ -124,7 +125,7 @@ int main(int argc, char *argv[])
 		.set_port(port)
 		.to_uri();
 
-	experimental::listener::http_listener listener(listenUri);
+	http_listener listener(listenUri);
 	listener.open().wait();
 	listener.support(AppServer(&ctx));
 

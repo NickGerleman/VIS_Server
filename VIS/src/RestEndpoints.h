@@ -28,4 +28,10 @@ namespace vis
 	/// @param request the incoming request
 	/// @param ctx the application context
 	web::http::http_response downloadMeshFile(const web::http::http_request& request, const DeviceContext& ctx);
+
+
+	/// Persist the clip volume to use during object scans
+	/// @param request the incoming request
+	/// @param ctx the application context
+	web::http::http_response setCalibrationVolume(const web::http::http_request& request, const DeviceContext& ctx);
 }

@@ -11,26 +11,6 @@ namespace fs = boost::filesystem;
 namespace vis
 {
 
-	boost::optional<fs::path> ensureModelPath()
-	{
-		char documentPath[MAX_PATH];
-		SHGetFolderPath(nullptr, CSIDL_PERSONAL, nullptr, SHGFP_TYPE_CURRENT, documentPath);
-		fs::path modelPath = fs::path(documentPath).append("VIS/Models");
-
-		if (!fs::is_directory(modelPath))
-		{
-			boost::system::error_code error;
-			if (!fs::create_directories(modelPath, error))
-			{
-				std::cerr << error.message() << std::endl;
-				return boost::optional<fs::path>();
-			}
-		}
-
-		return modelPath;
-	}
-
-
 	static json::value jsonPoint(const pcl::PointXYZ& point)
 	{
 		auto& pointArr = json::value::array();

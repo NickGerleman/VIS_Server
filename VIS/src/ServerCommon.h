@@ -9,11 +9,6 @@ namespace vis
 	class ProgressVisualizer;
 
 
-	/// Ensure that the model directory exists, creating it if neccesary. Returns
-	/// the path to this directory
-	boost::optional<boost::filesystem::path> ensureModelPath();
-
-
 	/// Generate an HTTP Response with a given point cloud
 	/// @param req the HTTP request
 	/// @param cloud the cloud to write
