@@ -187,7 +187,8 @@ namespace vis
 	{
 		http_response res;
 
-		auto jsonBody = request.extract_json().get();
+		// The real client currently doesn't set content type correctly, hack around this
+		auto jsonBody = request.extract_json(true/*ignore_content_type*/).get();
 		auto transformArr = jsonBody[L"transform"].as_array();
 		if (transformArr.size() != 16)
 		{
