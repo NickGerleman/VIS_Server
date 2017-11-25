@@ -98,7 +98,7 @@ static FsResult<fs::path> visRelToAbsPath(const fs::path& relPath, bool checkVal
 	if (checkValid)
 	{
 		if (!fs::exists(modelPath))
-			FsError::NOT_FOUND;
+			return FsError::NOT_FOUND;
 
 		// Prevent Traversal exploits
 		for (auto& subPath : modelPath)
