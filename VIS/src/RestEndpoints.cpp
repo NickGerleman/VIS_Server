@@ -130,7 +130,7 @@ namespace vis
 		size_t i = 0;
 		for (const auto& file : iter)
 		{
-			if (file.status().type() != fs::file_type::regular_file)
+			if (file.status().type() == fs::file_type::directory_file)
 				continue;
 
 			auto& fileObj = filesArr[i] = json::value::object();
